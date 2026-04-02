@@ -1,0 +1,90 @@
+{
+  "project": {
+    "name": "MP4 Motion Vector Visualization",
+    "task": "Build a research workflow to ingest two MP4 files, extract codec motion vectors, and visualize/compare them.",
+    "mode": "research",
+    "workflow_profile": "research-heavy"
+  },
+  "repo": {
+    "slug": "mp4-motion-vector-visualization",
+    "owner": "helionaut",
+    "url": "https://github.com/helionaut/mp4-motion-vector-visualization",
+    "dir": "/home/helionaut/src/projects/mp4-motion-vector-visualization",
+    "visibility": "private"
+  },
+  "linear": {
+    "project_id": "17ec9fd6-b299-4b88-a98c-efddeb9c3251",
+    "project_slug": "18afd661ce11",
+    "project_url": "https://linear.app/heliagents/project/mp4-motion-vector-visualization-18afd661ce11",
+    "starter_issue_id": "b5bba614-7816-4d48-a837-fd052d071765",
+    "starter_issue_identifier": "HEL-147",
+    "starter_issue_url": "https://linear.app/heliagents/issue/HEL-147/project-intake-mp4-motion-vector-visualization",
+    "issues": [
+      {
+        "key": "project-intake",
+        "id": "b5bba614-7816-4d48-a837-fd052d071765",
+        "identifier": "HEL-147",
+        "url": "https://linear.app/heliagents/issue/HEL-147/project-intake-mp4-motion-vector-visualization",
+        "title": "Project intake: MP4 Motion Vector Visualization"
+      },
+      {
+        "key": "prd",
+        "id": "98d9f332-92ee-4307-abec-057854cb20e4",
+        "identifier": "HEL-148",
+        "url": "https://linear.app/heliagents/issue/HEL-148/prd-and-experiment-contract-mp4-motion-vector-visualization",
+        "title": "PRD and experiment contract: MP4 Motion Vector Visualization"
+      },
+      {
+        "key": "environment",
+        "id": "7afd7065-2295-46c2-ba09-4163547d98c6",
+        "identifier": "HEL-149",
+        "url": "https://linear.app/heliagents/issue/HEL-149/environment-contract-and-reproducible-baseline-mp4-motion-vector",
+        "title": "Environment contract and reproducible baseline: MP4 Motion Vector Visualization"
+      },
+      {
+        "key": "inputs",
+        "id": "2e8d5c7d-51e9-4ca9-85f3-a4ad2713b909",
+        "identifier": "HEL-150",
+        "url": "https://linear.app/heliagents/issue/HEL-150/input-contract-and-readiness-mp4-motion-vector-visualization",
+        "title": "Input contract and readiness: MP4 Motion Vector Visualization"
+      },
+      {
+        "key": "public-baseline",
+        "id": "5912d63b-959a-4bdc-836d-8c1b18d3ed45",
+        "identifier": "HEL-151",
+        "url": "https://linear.app/heliagents/issue/HEL-151/public-known-good-baseline-mp4-motion-vector-visualization",
+        "title": "Public known-good baseline: MP4 Motion Vector Visualization"
+      },
+      {
+        "key": "validation",
+        "id": "f4529f9b-8dd5-47c5-a620-64e9b14c81c6",
+        "identifier": "HEL-152",
+        "url": "https://linear.app/heliagents/issue/HEL-152/user-data-validation-lane-mp4-motion-vector-visualization",
+        "title": "User-data validation lane: MP4 Motion Vector Visualization"
+      },
+      {
+        "key": "outcome",
+        "id": "15a7c251-c6ac-4964-9c1f-0a93d93b556a",
+        "identifier": "HEL-153",
+        "url": "https://linear.app/heliagents/issue/HEL-153/outcome-synthesis-and-next-step-report-mp4-motion-vector-visualization",
+        "title": "Outcome synthesis and next-step report: MP4 Motion Vector Visualization"
+      }
+    ]
+  },
+  "telegram": {
+    "chat_id": "-1003774956386",
+    "topic_id": "2604",
+    "topic_name": "MP4 Motion Vectors"
+  },
+  "deploy": {
+    "profile": "none"
+  },
+  "execution": {
+    "strategy": "docker"
+  },
+  "symphony": {
+    "unit_name": "symphony@mp4-motion-vector-visualization.service",
+    "launcher_path": "/home/helionaut/srv/symphony/mp4-motion-vector-visualization.sh",
+    "log_path": "/home/helionaut/srv/symphony/logs/mp4-motion-vector-visualization.log"
+  }
+}
