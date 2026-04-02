@@ -1,0 +1,27 @@
+{
+  "run_id": "public-baseline",
+  "status": "blocked",
+  "blocked_by": "motion-vector-payload-missing",
+  "missing_tools": [],
+  "expected_command_surface": "scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json",
+  "generated_at": "2026-04-02T18:41:09+00:00",
+  "notes": [
+    "ffprobe completed for both public MP4 inputs",
+    "codecview render artifacts were written",
+    "motion-vector side-data markers are present, but the ffprobe JSON payload does not include coordinate arrays"
+  ],
+  "details": {
+    "bbb_480p_30s": {
+      "frame_count": 720,
+      "frames_with_motion_side_data": 714,
+      "frames_with_vectors": 0,
+      "total_vectors": 0
+    },
+    "bbb_1080p_30s": {
+      "frame_count": 720,
+      "frames_with_motion_side_data": 714,
+      "frames_with_vectors": 0,
+      "total_vectors": 0
+    }
+  }
+}

@@ -8,12 +8,12 @@ Build a research workflow to ingest two MP4 files, extract codec motion vectors,
 
 ## Current answer state
 
-- Overall verdict: `open`
-- Highest-value unanswered question: which extraction path yields stable, reproducible motion-vector data from MP4 inputs on this stack with the least custom codec work?
+- Overall verdict: `public-baseline-failure-reproduced`
+- Highest-value unanswered question: which extractor or FFmpeg invocation change is required when `ffprobe` exposes motion-vector side-data markers but omits the coordinate payload for the agreed public MP4 pair?
 
 ## Reusable baseline
 
-- Known-good public baseline: pending HEL-151; target is two public sample MP4s plus a deterministic extractor/render command
+- Known-good public baseline: `configs/input_sets/public-baseline.json` -> `manifests/public-baseline.json` prepared by `scripts/prepare_public_inputs.sh`, then executed by `scripts/public_baseline.py`
 - Known-good private/user-data baseline: _not established yet_
 - Reusable build/tooling baseline: repo-local Dockerfile plus `scripts/run_in_docker.sh` with shared cache mounts; live container proof still requires a Docker-capable host
 - Shared cache root: `/home/helionaut/srv/research-cache/18afd661ce11`
@@ -34,8 +34,8 @@ This project should not branch into UI polish or speculative parser work until t
 ## Baseline hypothesis
 
 - Hypothesis: FFmpeg-exposed codec motion vectors are sufficient to build the first visualization and comparison workflow.
-- Success criterion: one reproducible command produces vector data plus render artifacts for two public MP4 samples.
-- Abort condition: if FFmpeg cannot expose the needed data reliably for the chosen samples/codecs, record the exact failure mode and move the changed variable to extractor selection instead of retrying blindly.
+- Success criterion: `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json` produces vector data plus render artifacts for the committed public MP4 pair.
+- Abort condition: if the same command cannot produce vectors or renders on this stack, record the exact failure mode in `reports/out/public-baseline/` and move the changed variable to extractor selection instead of retrying blindly.
 
 ## Expected research artifacts
 
@@ -43,6 +43,21 @@ This project should not branch into UI polish or speculative parser work until t
 - extracted vector data in a stable machine-readable format
 - overlay and/or comparison images or video artifacts
 - a short report describing what was proven, what remains open, and which variable changes next
+
+## HEL-151 outcome on this machine
+
+- Committed assets:
+  - `manifests/public-baseline.json`
+  - `scripts/public_baseline.py`
+  - `reports/out/public-baseline/status.json`
+  - `reports/out/public-baseline/report.md`
+- What is proven here:
+  - the public baseline reuses the established HEL-150 public input contract
+  - the runner emits deterministic extraction, render, and comparison steps from that manifest
+  - `scripts/prepare_public_inputs.sh` succeeds on this host and the baseline writes render artifacts for both public MP4 inputs
+  - the failure is narrower than environment bootstrap: `ffprobe` marks `Motion vectors` side data on 714 frames per input, but the JSON payload omits coordinate arrays, so machine-readable vectors remain unavailable
+- Changed variable recommended next:
+  - extractor invocation/selection, not environment or input preparation
 
 ## Experiment ledger rules
 
