@@ -1,0 +1,26 @@
+name: PRD Contract
+
+on:
+  pull_request:
+    paths:
+      - "docs/PRD.md"
+      - "scripts/validate_prd_contract.sh"
+      - ".github/workflows/prd-contract.yml"
+  push:
+    branches:
+      - main
+      - "eugeniy/**"
+    paths:
+      - "docs/PRD.md"
+      - "scripts/validate_prd_contract.sh"
+      - ".github/workflows/prd-contract.yml"
+
+jobs:
+  validate-prd-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate PRD contract
+        run: bash scripts/validate_prd_contract.sh
