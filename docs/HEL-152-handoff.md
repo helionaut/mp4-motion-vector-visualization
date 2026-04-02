@@ -22,9 +22,9 @@ This pass confirmed that HEL-151 now publishes a reusable public failure boundar
 ## Findings
 
 1. HEL-151 is still `In Progress`.
-2. HEL-151 now has a published remote branch and draft PR #5 (`Reproduce public MP4 baseline extractor failure`) at head `34cd50a32f7c7e0c3a6c20f5d7dc864a11d50a53`.
-3. PR #5 now publishes a stronger reusable public failure boundary instead of the older missing-runtime-only report.
-4. Its committed `reports/out/public-baseline/status.json` records `motion-vector-payload-missing` with the exact command surface `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json`.
+2. HEL-151 now has a published remote branch `eugeniy/hel-151-public-known-good-baseline-mp4-motion-vector-visualization` and open PR #5 (`Reproduce public MP4 baseline extractor failure`) at head `34cd50a32f7c7e0c3a6c20f5d7dc864a11d50a53`.
+3. PR #5 publishes a stronger reusable public failure boundary instead of the older missing-runtime-only report.
+4. Its committed `reports/out/public-baseline/status.json` records `motion-vector-payload-missing` with the exact command surface `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json`, and the PR body already records that same command as an expected-exit-`3` validation step.
 5. The committed report says both public inputs produced render artifacts and `ffprobe` side-data markers on 714 frames each, but zero exported motion-vector payload coordinates.
 6. `scripts/bootstrap_media_tools.sh` now proves this host can bootstrap runnable static `ffprobe` and `ffmpeg` binaries under the shared toolchain cache even though no system binaries are on `PATH`.
 7. HEL-152 now has a committed private staging path via `configs/input_sets/private-template.json` and `scripts/prepare_private_inputs.sh`, so the repo no longer needs a new adapter before the user MP4 pair arrives.
@@ -44,7 +44,7 @@ This pass confirmed that HEL-151 now publishes a reusable public failure boundar
 - environment contract: `docs/ENVIRONMENT.md`
 - public and private input contract: `docs/INPUTS.md`, `scripts/prepare_inputs.py`, `scripts/prepare_private_inputs.sh`, `configs/input_sets/private-template.json`, `manifests/public-baseline.json`
 - shared cache root: `/home/helionaut/srv/research-cache/18afd661ce11`
-- HEL-151 draft PR #5 at `34cd50a32f7c7e0c3a6c20f5d7dc864a11d50a53`
+- HEL-151 published branch `eugeniy/hel-151-public-known-good-baseline-mp4-motion-vector-visualization` and open PR #5 at `34cd50a32f7c7e0c3a6c20f5d7dc864a11d50a53`
 - committed public failure artifacts in `reports/out/public-baseline/`
 - public command surface: `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json`
 
