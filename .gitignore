@@ -1,3 +1,5 @@
 .symphony/
 __pycache__/
 *.pyc
+reports/out/*/vectors/*.ffprobe.json
+reports/out/*/vectors/*.summary.json
