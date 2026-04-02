@@ -22,25 +22,43 @@ Rules:
 
 ## Source Inputs
 
-List the highest-fidelity assets already provided or expected here.
+The workflow expects two MP4 source inputs for every comparison run.
 
-Example fields:
+Initial intake assumptions:
+- baseline lane: use two public/shareable sample MP4s so extraction can be proven without waiting on private access
+- validation lane: rerun the same workflow on user/private MP4s only after the public baseline is stable
+
+Capture each source with:
 - source name
-- where it arrived from
-- whether it is private/local-only
+- whether it is `public` or `private`
 - current path or retrieval command
-- notes on trust level or provenance
+- codec/container notes if known
+- trust/provenance notes
+
+Current status:
+- Public MP4 pair: not selected yet; HEL-150 should name the exact source and retrieval command
+- Private/user MP4 pair: not provided in this intake; only a blocker if HEL-152 begins and no private inputs exist then
 
 ## Prepared Artifacts
 
-List the exact artifacts downstream tasks actually consume.
+The downstream workflow should consume these prepared artifacts:
 
-Example fields:
-- prepared artifact name
-- generator script or command
-- output path
-- validation command
-- downstream tasks that depend on it
+- normalized run manifest
+  - generator: repo-local script or config created in HEL-150/HEL-151
+  - output path: `manifests/<run-id>.json`
+  - purpose: records the two MP4 inputs, extractor settings, and output artifact paths
+- extracted motion-vector data
+  - generator: baseline extractor command
+  - output path: `reports/out/<run-id>/vectors/<input-name>.json` or equivalent stable format
+  - purpose: per-frame vector data for rendering and comparison
+- render artifacts
+  - generator: baseline visualization step
+  - output path: `reports/out/<run-id>/renders/`
+  - purpose: visual overlays or frame summaries per input
+- comparison artifact
+  - generator: baseline comparison step
+  - output path: `reports/out/<run-id>/comparison/`
+  - purpose: side-by-side or aggregate comparison output
 
 ## Deterministic Paths
 
@@ -54,21 +72,25 @@ Suggested conventions:
 - manifests describing prepared runs: `manifests/`
 - logs and reports: `logs/out/` and `reports/out/`
 
+For shared-cache reuse on this project:
+- reusable public or private media inputs should live under `/home/helionaut/srv/research-cache/18afd661ce11/datasets`
+- heavy generated artifacts should live under `/home/helionaut/srv/research-cache/18afd661ce11/artifacts`
+- repo-local paths should store manifests, scripts, and lightweight reports that describe how to reproduce those artifacts
+
 ## Bootstrap And Acquisition
 
-Document every required external tool, download, or setup step here.
+HEL-150 should make these steps concrete:
 
-Each step should answer:
-- what is needed
-- how the repo installs or fetches it
-- how to verify it is ready
+1. identify or fetch a public MP4 pair suitable for motion-vector extraction
+2. verify the files are readable with `ffprobe`
+3. record codec/container metadata that could affect extractor behavior
+4. define the manifest shape that points the extractor at the two inputs
+5. document how private/user inputs should be placed for the later validation lane
 
 ## Real Gaps
 
-Only unresolved blockers belong here.
-
-Each gap should say:
-- what is truly missing
-- why it cannot be derived from existing raw assets
-- who can resolve it
-- which downstream task is blocked
+- Exact public sample MP4 pair is still missing.
+  - Why it matters: HEL-151 needs a shareable baseline input set.
+  - Downstream impact: blocks the public known-good baseline until HEL-150 names the files.
+- Private/user MP4 pair is not yet required for this intake ticket.
+  - Why it is not a current blocker: HEL-152 is the first lane that should depend on those assets.

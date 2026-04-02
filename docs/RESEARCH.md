@@ -9,14 +9,40 @@ Build a research workflow to ingest two MP4 files, extract codec motion vectors,
 ## Current answer state
 
 - Overall verdict: `open`
-- Highest-value unanswered question: _fill this in during PRD / experiment-contract work_
+- Highest-value unanswered question: which extraction path yields stable, reproducible motion-vector data from MP4 inputs on this stack with the least custom codec work?
 
 ## Reusable baseline
 
-- Known-good public baseline: _not established yet_
+- Known-good public baseline: pending HEL-151; target is two public sample MP4s plus a deterministic extractor/render command
 - Known-good private/user-data baseline: _not established yet_
-- Reusable build/tooling baseline: _not established yet_
-- Shared cache root: `~/srv/research-cache/mp4-motion-vector-visualization`
+- Reusable build/tooling baseline: pending HEL-149; Docker-based media analysis environment with shared cache mounts
+- Shared cache root: `/home/helionaut/srv/research-cache/18afd661ce11`
+
+## Intake translation
+
+The intake resolves into one research spine:
+
+1. define the experiment contract and acceptance boundary
+2. lock a reproducible Docker environment
+3. define and validate the two-MP4 input contract
+4. prove a public extraction/render baseline
+5. rerun on private data only after the public lane is stable
+6. synthesize findings and recommend the next slice
+
+This project should not branch into UI polish or speculative parser work until the public baseline proves that extracted motion vectors can be rendered and compared credibly.
+
+## Baseline hypothesis
+
+- Hypothesis: FFmpeg-exposed codec motion vectors are sufficient to build the first visualization and comparison workflow.
+- Success criterion: one reproducible command produces vector data plus render artifacts for two public MP4 samples.
+- Abort condition: if FFmpeg cannot expose the needed data reliably for the chosen samples/codecs, record the exact failure mode and move the changed variable to extractor selection instead of retrying blindly.
+
+## Expected research artifacts
+
+- a command or script that ingests two MP4 paths deterministically
+- extracted vector data in a stable machine-readable format
+- overlay and/or comparison images or video artifacts
+- a short report describing what was proven, what remains open, and which variable changes next
 
 ## Experiment ledger rules
 
