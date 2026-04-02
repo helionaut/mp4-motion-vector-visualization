@@ -14,7 +14,7 @@ Build a research workflow to ingest two MP4 files, extract codec motion vectors,
 ## Reusable baseline
 
 - Known-good public baseline: a truthful public success proof is still not established, but HEL-151 now publishes a reusable stronger failure boundary on branch `eugeniy/hel-151-public-known-good-baseline-mp4-motion-vector-visualization` / PR #5, and HEL-152 now carries the same runner locally: `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json` writes render artifacts for both public MP4 inputs and ends at `motion-vector-payload-missing` with 714 frames of motion-vector side-data markers but zero exported vectors per input; PR #5 records that command as an expected-exit-`3` validation step
-- Known-good private/user-data baseline: not established yet; HEL-152 now has a committed private validation path (`scripts/run_private_validation.sh`, `scripts/prepare_private_inputs.sh`, and `configs/input_sets/private-template.json`) and can execute the published public runner on this host, but it should not rerun on private data until the real user MP4 pair is staged
+- Known-good private/user-data baseline: HEL-152 has now exercised the committed private validation path on a real local candidate pair via `scripts/run_private_validation.sh`; it staged the files into the shared cache, wrote `manifests/user-validation.json`, and reproduced the same blocker as the public lane: motion-vector side-data bytes exist, but the FFmpeg CLI path still emits zero coordinate-bearing vectors
 - Reusable build/tooling baseline: repo-local Dockerfile plus `scripts/run_in_docker.sh` with shared cache mounts; live container proof still requires a Docker-capable host
 - Shared cache root: `/home/helionaut/srv/research-cache/18afd661ce11`
 
@@ -61,13 +61,13 @@ This project should not branch into UI polish or speculative parser work until t
 
 ## HEL-152 status in project context
 
-- Private/user-data validation is not proven.
-- This is not primarily blocked by missing private files yet; it is blocked by the unresolved public extraction lane.
+- Private/user-data validation is now partially proven.
+- HEL-152 is no longer blocked on missing private files; the private lane ran on a real candidate pair and reproduced the same unresolved extractor boundary as the public lane.
 - The reusable private-data contract from `docs/INPUTS.md` is still valid:
   - raw inputs belong under `/home/helionaut/srv/research-cache/18afd661ce11/datasets/user/raw/<run-id>/`
   - prepared metadata belongs under `/home/helionaut/srv/research-cache/18afd661ce11/datasets/user/prepared/<run-id>/`
   - the same manifest shape can be reused once secure provenance replaces public `source_url` fields
-- Do not spend the next issue on private-data reruns until the public extractor lane can produce non-empty machine-readable vectors.
+- Do not spend the next issue on more private-data reruns until the extractor lane can produce non-empty machine-readable vectors.
 
 ## HEL-153 synthesis
 
