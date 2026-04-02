@@ -9,7 +9,7 @@ HEL-152 is the private-data validation lane. It only makes sense after the publi
 
 ## Tactical result from this pass
 
-This pass rechecked the published HEL-152 validation lane against the current workspace state: local and published branch heads both resolve to PR #6 head `3e2c7bb`, the HEL-155 FFmpeg decode-path baseline remains the committed surface this lane must reuse, and the one-command private validation wrapper is still correctly blocked by a machine-readable `missing-user-inputs` result until the real user MP4 pair is staged.
+This pass rechecked the published HEL-152 validation lane against the current workspace state: local and published branch heads both resolve to PR #6 head `49375c7`, the HEL-155 FFmpeg decode-path baseline remains the committed surface this lane must reuse, the last green validation artifact still belongs to `3e2c7bb`, and the one-command private validation wrapper is still correctly blocked by a machine-readable `missing-user-inputs` result until the real user MP4 pair is staged.
 
 ## What was checked
 
@@ -21,8 +21,8 @@ This pass rechecked the published HEL-152 validation lane against the current wo
 
 ## Findings
 
-1. PR #6 (`HEL-152: self-contain baseline and private validation`) is still open and draft on GitHub at head `3e2c7bb0fba22e8de3d9f8b02b95c11bda599795`.
-2. The local workspace head and `origin/eugeniy/hel-152-user-data-validation-lane-mp4-motion-vector-visualization` both resolve to `3e2c7bb`, so there is no unpublished local divergence to repair before the next rerun.
+1. PR #6 (`HEL-152: self-contain baseline and private validation`) is still open and draft on GitHub at head `49375c7240d4b00c4432b68ad23e28b7f9ec3aa9`.
+2. The local workspace head and `origin/eugeniy/hel-152-user-data-validation-lane-mp4-motion-vector-visualization` both resolve to `49375c7`, so there is no unpublished local divergence to repair before the next rerun.
 3. HEL-152 still inherits the HEL-155 public baseline surface from `origin/main`, not the older HEL-151 `ffprobe` boundary.
 4. The committed `reports/out/public-baseline/status.json` records the current public-lane blocker `ffmpeg-export-side-data-mvs-cli-lacks-coordinate-vectors`.
 5. That committed report proves the FFmpeg decode path surfaces motion-vector side-data bytes on 714/720 frames for both public inputs, but still serializes zero coordinate-bearing vectors.
@@ -46,7 +46,7 @@ This pass rechecked the published HEL-152 validation lane against the current wo
 - public and private input contract: `docs/INPUTS.md`, `scripts/prepare_inputs.py`, `scripts/prepare_private_inputs.sh`, `scripts/run_private_validation.sh`, `scripts/public_baseline.py`, `scripts/validate_public_baseline.py`, `configs/input_sets/private-template.json`, `manifests/public-baseline.json`
 - shared cache root: `/home/helionaut/srv/research-cache/18afd661ce11`
 - HEL-155 landed on `origin/main` as commit `59e42f64416d7aa0a4b768f4f1885bc525f0b7c4`
-- current review branch / PR: `eugeniy/hel-152-user-data-validation-lane-mp4-motion-vector-visualization` / PR #6 at `3e2c7bb0fba22e8de3d9f8b02b95c11bda599795`
+- current review branch / PR: `eugeniy/hel-152-user-data-validation-lane-mp4-motion-vector-visualization` / PR #6 at `49375c7240d4b00c4432b68ad23e28b7f9ec3aa9`
 - committed public failure artifacts in `reports/out/public-baseline/`
 - public command surface: `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-155.json`
 
