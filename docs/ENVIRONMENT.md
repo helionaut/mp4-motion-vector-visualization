@@ -25,16 +25,40 @@ Issue workspaces are disposable. Reusable environment decisions, heavy downloads
 ## Current contract
 
 - Strategy: `docker`
-- Status: `draft until the first environment issue resolves`
-- Shared cache root: `~/srv/research-cache/mp4-motion-vector-visualization`
+- Status: `draft until HEL-149 locks the first known-good baseline`
+- Shared cache root: `/home/helionaut/srv/research-cache/18afd661ce11`
 - Stable subdirectories:
-  - downloads: `~/srv/research-cache/mp4-motion-vector-visualization/downloads`
-  - datasets: `~/srv/research-cache/mp4-motion-vector-visualization/datasets`
-  - toolchains: `~/srv/research-cache/mp4-motion-vector-visualization/toolchains`
-  - builds: `~/srv/research-cache/mp4-motion-vector-visualization/builds`
-  - artifacts: `~/srv/research-cache/mp4-motion-vector-visualization/artifacts`
-  - logs: `~/srv/research-cache/mp4-motion-vector-visualization/logs`
-  - docker state/volumes: `~/srv/research-cache/mp4-motion-vector-visualization/docker`
+  - downloads: `/home/helionaut/srv/research-cache/18afd661ce11/downloads`
+  - datasets: `/home/helionaut/srv/research-cache/18afd661ce11/datasets`
+  - toolchains: `/home/helionaut/srv/research-cache/18afd661ce11/toolchains`
+  - builds: `/home/helionaut/srv/research-cache/18afd661ce11/builds`
+  - artifacts: `/home/helionaut/srv/research-cache/18afd661ce11/artifacts`
+  - logs: `/home/helionaut/srv/research-cache/18afd661ce11/logs`
+  - docker state/volumes: `/home/helionaut/srv/research-cache/18afd661ce11/docker`
+
+## First environment target
+
+HEL-149 should produce the smallest reproducible container baseline that can:
+
+- run FFmpeg/ffprobe against MP4 inputs
+- write extracted vector data and rendered artifacts to mounted cache-backed paths
+- expose one repo-local entry command future agents can reuse without host-specific guesswork
+
+The first environment lane should not optimize performance or add optional tooling until the baseline extraction path is proven.
+
+## Expected mounted paths
+
+- repo workspace: disposable checkout for scripts and docs
+- shared datasets/artifacts/logs: mounted from `/home/helionaut/srv/research-cache/18afd661ce11`
+- output discipline: reusable downloads, datasets, and heavy build outputs must stay under the shared cache root
+
+## Likely package surface
+
+Record and justify the final list in HEL-149, but the baseline should assume:
+
+- FFmpeg and ffprobe
+- Python 3 for orchestration/reporting helpers
+- optional image/video plotting dependencies only if the first render artifact requires them
 
 ## Reuse rules
 
