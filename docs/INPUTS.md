@@ -36,7 +36,12 @@ Capture each source with:
 - trust/provenance notes
 
 Current status:
-- Public MP4 pair: not selected yet; HEL-150 should name the exact source and retrieval command
+- Public MP4 pair: selected as a deterministic synthetic fixture pair generated from FFmpeg lavfi sources
+  - manifest: `manifests/public_known_good_baseline.json`
+  - input A: `synthetic-grid` -> `datasets/fixtures/public-known-good/synthetic-grid.mp4`
+  - input B: `synthetic-rotating-pattern` -> `datasets/fixtures/public-known-good/synthetic-rotating-pattern.mp4`
+  - generator path: `scripts/run_in_docker.sh run -- python3 scripts/public_baseline.py run --manifest manifests/public_known_good_baseline.json`
+  - provenance: both files are shareable/generated fixtures, not user data
 - Private/user MP4 pair: not provided in this intake; only a blocker if HEL-152 begins and no private inputs exist then
 
 ## Prepared Artifacts
@@ -81,16 +86,16 @@ For shared-cache reuse on this project:
 
 HEL-150 should make these steps concrete:
 
-1. identify or fetch a public MP4 pair suitable for motion-vector extraction
-2. verify the files are readable with `ffprobe`
-3. record codec/container metadata that could affect extractor behavior
-4. define the manifest shape that points the extractor at the two inputs
+1. generate the deterministic public MP4 pair from `manifests/public_known_good_baseline.json`
+2. verify the generated files are readable with `ffprobe`
+3. export motion-vector side data with `ffprobe -flags2 +export_mvs`
+4. render one codecview overlay per input plus one SVG comparison summary
 5. document how private/user inputs should be placed for the later validation lane
 
 ## Real Gaps
 
-- Exact public sample MP4 pair is still missing.
-  - Why it matters: HEL-151 needs a shareable baseline input set.
-  - Downstream impact: blocks the public known-good baseline until HEL-150 names the files.
+- The public baseline runner cannot execute on the current machine because the host lacks `docker`, `ffmpeg`, and `ffprobe`.
+  - Why it matters: HEL-151 can only leave behind a reproducible failure artifact here, not a live success run.
+  - Downstream impact: a Docker-capable host must rerun the committed command surface before HEL-152 should reuse the baseline.
 - Private/user MP4 pair is not yet required for this intake ticket.
   - Why it is not a current blocker: HEL-152 is the first lane that should depend on those assets.
