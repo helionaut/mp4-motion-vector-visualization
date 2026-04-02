@@ -1,0 +1,104 @@
+{
+  "comparison_label": "big-buck-bunny-480p-vs-1080p",
+  "generated_at": "2026-04-02T18:14:03.071971Z",
+  "inputs": [
+    {
+      "filename": "big-buck-bunny-480p-30sec.mp4",
+      "license_url": "https://raw.githubusercontent.com/chthomos/video-media-samples/master/LICENSE.md",
+      "name": "bbb_480p_30s",
+      "notes": "30 second Big Buck Bunny clip at 480p.",
+      "probe_path": "/home/helionaut/srv/research-cache/18afd661ce11/datasets/public/prepared/public-baseline/probe/bbb_480p_30s.ffprobe.json",
+      "probe_summary": {
+        "audio_channels": 6,
+        "audio_codec": "aac",
+        "audio_sample_rate": "48000",
+        "avg_frame_rate": "24/1",
+        "bit_rate": "1103952",
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "duration_seconds": "30.000000",
+        "height": 480,
+        "pix_fmt": "yuv420p",
+        "size_bytes": "4139823",
+        "video_codec": "h264",
+        "video_profile": "High",
+        "width": 854
+      },
+      "provenance": "chthomos/video-media-samples",
+      "raw_path": "/home/helionaut/srv/research-cache/18afd661ce11/datasets/public/raw/public-baseline/big-buck-bunny-480p-30sec.mp4",
+      "raw_sha256": "521a78e22a4065814066d8a60d53b99472a80d6a8fb0908370df0410298b4b12",
+      "source_page_url": "https://github.com/chthomos/video-media-samples",
+      "source_url": "https://raw.githubusercontent.com/chthomos/video-media-samples/master/big-buck-bunny-480p-30sec.mp4",
+      "visibility": "public"
+    },
+    {
+      "filename": "big-buck-bunny-1080p-30sec.mp4",
+      "license_url": "https://raw.githubusercontent.com/chthomos/video-media-samples/master/LICENSE.md",
+      "name": "bbb_1080p_30s",
+      "notes": "30 second Big Buck Bunny clip at 1080p.",
+      "probe_path": "/home/helionaut/srv/research-cache/18afd661ce11/datasets/public/prepared/public-baseline/probe/bbb_1080p_30s.ffprobe.json",
+      "probe_summary": {
+        "audio_channels": 6,
+        "audio_codec": "aac",
+        "audio_sample_rate": "48000",
+        "avg_frame_rate": "24/1",
+        "bit_rate": "6058269",
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "duration_seconds": "30.000000",
+        "height": 1080,
+        "pix_fmt": "yuv420p",
+        "size_bytes": "22718509",
+        "video_codec": "h264",
+        "video_profile": "High",
+        "width": 1920
+      },
+      "provenance": "chthomos/video-media-samples",
+      "raw_path": "/home/helionaut/srv/research-cache/18afd661ce11/datasets/public/raw/public-baseline/big-buck-bunny-1080p-30sec.mp4",
+      "raw_sha256": "07b756a4c7b481829776645c153167ca14c9df802ddbea7dffda3d817aa5261a",
+      "source_page_url": "https://github.com/chthomos/video-media-samples",
+      "source_url": "https://raw.githubusercontent.com/chthomos/video-media-samples/master/big-buck-bunny-1080p-30sec.mp4",
+      "visibility": "public"
+    }
+  ],
+  "manifest_version": 1,
+  "paths": {
+    "comparison_dir": "reports/out/public-baseline/comparison",
+    "datasets_root": "/home/helionaut/srv/research-cache/18afd661ce11/datasets",
+    "manifest_path": "/home/helionaut/workspaces/HEL-150/manifests/public-baseline.json",
+    "private_prepared_dir": "/home/helionaut/srv/research-cache/18afd661ce11/datasets/user/prepared/public-baseline",
+    "private_raw_dir": "/home/helionaut/srv/research-cache/18afd661ce11/datasets/user/raw/public-baseline",
+    "public_prepared_dir": "/home/helionaut/srv/research-cache/18afd661ce11/datasets/public/prepared/public-baseline",
+    "public_raw_dir": "/home/helionaut/srv/research-cache/18afd661ce11/datasets/public/raw/public-baseline",
+    "renders_dir": "reports/out/public-baseline/renders",
+    "vectors_dir": "reports/out/public-baseline/vectors"
+  },
+  "private_input_contract": {
+    "expected_prepared_dir": "/home/helionaut/srv/research-cache/18afd661ce11/datasets/user/prepared/public-baseline",
+    "expected_raw_dir": "/home/helionaut/srv/research-cache/18afd661ce11/datasets/user/raw/public-baseline",
+    "notes": [
+      "HEL-152 should place user-provided MP4 files under the shared cache user/raw path for its run id.",
+      "The same manifest shape can be reused once source_url fields are replaced by secure provenance notes."
+    ]
+  },
+  "provenance": {
+    "license_notes": "Repository is MIT-licensed; bundled Big Buck Bunny source footage is CC BY 3.0 per upstream LICENSE.md.",
+    "license_url": "https://raw.githubusercontent.com/chthomos/video-media-samples/master/LICENSE.md",
+    "notes": [
+      "Both files are H.264/AAC MP4 samples from the same public repository.",
+      "The pair keeps content constant while varying encode characteristics, which is useful for the first extraction/comparison baseline."
+    ],
+    "source_page_url": "https://github.com/chthomos/video-media-samples"
+  },
+  "run_id": "public-baseline",
+  "tooling": {
+    "ffprobe_args": [
+      "-v",
+      "error",
+      "-print_format",
+      "json",
+      "-show_format",
+      "-show_streams"
+    ],
+    "ffprobe_bin": "/home/helionaut/srv/research-cache/18afd661ce11/toolchains/ffmpeg-johnvansickle-static/ffprobe"
+  },
+  "visibility": "public"
+}
