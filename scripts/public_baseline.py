@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -15,6 +16,9 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_MANIFEST = REPO_ROOT / "manifests" / "public-baseline.json"
+DEFAULT_PROGRESS_ARTIFACT = REPO_ROOT / ".symphony" / "progress" / "HEL-155.json"
+FRAME_LINE_RE = re.compile(r"n:\s*(\d+).*?\btype:([A-Z])\b")
+MOTION_VECTOR_BYTES_RE = re.compile(r"side data - Motion vectors: \((\d+) bytes\)")
 
 
 def utc_now() -> str:
@@ -34,6 +38,41 @@ def load_manifest(manifest_path: Path) -> dict[str, Any]:
 
 def ensure_parent(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def write_progress_artifact(
+    progress_path: Path,
+    *,
+    status: str,
+    current_step: str,
+    completed: int | None = None,
+    total: int | None = None,
+    unit: str = "frames",
+    rate: float | None = None,
+    eta_seconds: float | None = None,
+    metrics: dict[str, Any] | None = None,
+    artifacts: dict[str, Any] | None = None,
+) -> None:
+    ensure_parent(progress_path)
+    progress: dict[str, Any] = {
+        "status": status,
+        "current_step": current_step,
+        "updated_at": utc_now(),
+        "unit": unit,
+        "metrics": metrics or {},
+        "artifacts": artifacts or {},
+    }
+    if completed is not None:
+        progress["completed"] = completed
+    if total is not None:
+        progress["total"] = total
+        if total:
+            progress["progress_percent"] = round((completed or 0) / total * 100, 2)
+    if rate is not None:
+        progress["rate"] = round(rate, 6)
+    if eta_seconds is not None:
+        progress["eta_seconds"] = round(eta_seconds, 3)
+    progress_path.write_text(json.dumps(progress, indent=2) + "\n")
 
 
 def run_command(command: list[str], *, capture: bool = False) -> subprocess.CompletedProcess[str]:
@@ -81,12 +120,29 @@ def build_ffprobe_command(ffprobe_bin: Path, input_spec: dict[str, Any]) -> list
     ]
 
 
+def build_extract_command(ffmpeg_bin: Path, input_spec: dict[str, Any]) -> list[str]:
+    return [
+        str(ffmpeg_bin),
+        "-hide_banner",
+        "-export_side_data",
+        "+mvs",
+        "-i",
+        input_spec["raw_path"],
+        "-an",
+        "-vf",
+        "showinfo",
+        "-f",
+        "null",
+        "-",
+    ]
+
+
 def build_render_command(ffmpeg_bin: Path, input_spec: dict[str, Any], output_path: Path) -> list[str]:
     return [
         str(ffmpeg_bin),
         "-y",
-        "-flags2",
-        "+export_mvs",
+        "-export_side_data",
+        "+mvs",
         "-i",
         input_spec["raw_path"],
         "-vf",
@@ -149,6 +205,120 @@ def summarize_ffprobe_frames(ffprobe_doc: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def summarize_ffmpeg_showinfo(log_text: str) -> dict[str, Any]:
+    frame_summaries: list[dict[str, Any]] = []
+    current_frame: dict[str, Any] | None = None
+    total_motion_vector_payload_bytes = 0
+    frames_with_motion_side_data = 0
+    max_motion_vector_payload_bytes = 0
+
+    for line in log_text.splitlines():
+        frame_match = FRAME_LINE_RE.search(line)
+        if frame_match:
+            current_frame = {
+                "frame_index": int(frame_match.group(1)),
+                "pict_type": frame_match.group(2),
+                "motion_vector_side_data_present": False,
+                "motion_vector_payload_bytes": 0,
+                "vector_count": 0,
+            }
+            frame_summaries.append(current_frame)
+            continue
+
+        payload_match = MOTION_VECTOR_BYTES_RE.search(line)
+        if payload_match and current_frame is not None:
+            payload_bytes = int(payload_match.group(1))
+            current_frame["motion_vector_side_data_present"] = True
+            current_frame["motion_vector_payload_bytes"] = payload_bytes
+            total_motion_vector_payload_bytes += payload_bytes
+            frames_with_motion_side_data += 1
+            max_motion_vector_payload_bytes = max(max_motion_vector_payload_bytes, payload_bytes)
+
+    mean_payload_bytes = (
+        total_motion_vector_payload_bytes / frames_with_motion_side_data
+        if frames_with_motion_side_data
+        else 0.0
+    )
+    return {
+        "extractor_surface": "ffmpeg -export_side_data +mvs -vf showinfo",
+        "frame_count": len(frame_summaries),
+        "frames_with_vectors": 0,
+        "frames_with_motion_side_data": frames_with_motion_side_data,
+        "total_vectors": 0,
+        "mean_vector_magnitude": 0.0,
+        "coordinate_vectors_available": False,
+        "total_motion_vector_payload_bytes": total_motion_vector_payload_bytes,
+        "mean_motion_vector_payload_bytes": round(mean_payload_bytes, 6),
+        "max_motion_vector_payload_bytes": max_motion_vector_payload_bytes,
+        "frames": frame_summaries,
+    }
+
+
+def estimate_input_frame_count(input_spec: dict[str, Any]) -> int | None:
+    probe_summary = input_spec.get("probe_summary") or {}
+    avg_frame_rate = probe_summary.get("avg_frame_rate")
+    duration_seconds = probe_summary.get("duration_seconds")
+    if not avg_frame_rate or not duration_seconds:
+        return None
+    try:
+        numerator, denominator = avg_frame_rate.split("/", 1)
+        fps = float(numerator) / float(denominator)
+        duration = float(duration_seconds)
+    except (ValueError, ZeroDivisionError):
+        return None
+    return max(1, round(fps * duration))
+
+
+def run_extract_command(
+    command: list[str],
+    *,
+    log_path: Path,
+    progress_path: Path,
+    input_name: str,
+    processed_frames_before: int,
+    total_frames: int | None,
+    artifacts: dict[str, Any],
+) -> str:
+    ensure_parent(log_path)
+    process = subprocess.Popen(
+        command,
+        cwd=REPO_ROOT,
+        text=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+    )
+    lines: list[str] = []
+    decoded_frames = 0
+    try:
+        assert process.stderr is not None
+        for raw_line in process.stderr:
+            lines.append(raw_line)
+            frame_match = FRAME_LINE_RE.search(raw_line)
+            if frame_match:
+                decoded_frames = max(decoded_frames, int(frame_match.group(1)) + 1)
+                completed = processed_frames_before + decoded_frames
+                write_progress_artifact(
+                    progress_path,
+                    status="running",
+                    current_step=f"extracting {input_name} with ffmpeg -export_side_data +mvs",
+                    completed=completed,
+                    total=total_frames,
+                    metrics={
+                        "input": input_name,
+                        "decoded_frames_current_input": decoded_frames,
+                    },
+                    artifacts=artifacts,
+                )
+    finally:
+        return_code = process.wait()
+
+    log_text = "".join(lines)
+    log_path.write_text(log_text)
+    if return_code != 0:
+        raise subprocess.CalledProcessError(return_code, command)
+    return log_text
+
+
 def build_comparison_summary(per_input: dict[str, dict[str, Any]]) -> dict[str, Any]:
     items = []
     for name, summary in per_input.items():
@@ -160,6 +330,8 @@ def build_comparison_summary(per_input: dict[str, dict[str, Any]]) -> dict[str, 
                 "frames_with_vectors": summary["frames_with_vectors"],
                 "frames_with_motion_side_data": summary["frames_with_motion_side_data"],
                 "frame_count": summary["frame_count"],
+                "total_motion_vector_payload_bytes": summary.get("total_motion_vector_payload_bytes", 0),
+                "mean_motion_vector_payload_bytes": summary.get("mean_motion_vector_payload_bytes", 0.0),
             }
         )
 
@@ -171,39 +343,45 @@ def build_comparison_summary(per_input: dict[str, dict[str, Any]]) -> dict[str, 
     magnitude_delta = round(
         left["mean_vector_magnitude"] - right["mean_vector_magnitude"], 6
     )
-    winner = left["name"] if left["total_vectors"] >= right["total_vectors"] else right["name"]
+    payload_delta = left["total_motion_vector_payload_bytes"] - right["total_motion_vector_payload_bytes"]
+    winner = (
+        left["name"]
+        if left["total_motion_vector_payload_bytes"] >= right["total_motion_vector_payload_bytes"]
+        else right["name"]
+    )
 
     return {
         "inputs": items,
         "delta": {
             "vector_count": vector_delta,
             "mean_vector_magnitude": magnitude_delta,
+            "motion_vector_payload_bytes": payload_delta,
         },
-        "higher_vector_count_input": winner,
+        "higher_motion_vector_payload_input": winner,
     }
 
 
 def build_comparison_svg(comparison_summary: dict[str, Any]) -> str:
     inputs = comparison_summary["inputs"]
-    max_vectors = max(item["total_vectors"] for item in inputs) or 1
-    max_magnitude = max(item["mean_vector_magnitude"] for item in inputs) or 1
+    max_payload_bytes = max(item["total_motion_vector_payload_bytes"] for item in inputs) or 1
+    max_side_data_frames = max(item["frames_with_motion_side_data"] for item in inputs) or 1
     lines = [
         "<svg xmlns='http://www.w3.org/2000/svg' width='720' height='260' viewBox='0 0 720 260'>",
         "<rect width='720' height='260' fill='#f7f4ea' />",
-        "<text x='32' y='40' font-family='monospace' font-size='20' fill='#1f2933'>Public Known-Good Baseline Comparison</text>",
+        "<text x='32' y='40' font-family='monospace' font-size='20' fill='#1f2933'>FFmpeg export_side_data MVS Comparison</text>",
     ]
     colors = ["#2563eb", "#dc2626"]
     for index, item in enumerate(inputs):
         bar_y = 70 + index * 90
-        vector_width = int((item["total_vectors"] / max_vectors) * 280)
-        magnitude_width = int((item["mean_vector_magnitude"] / max_magnitude) * 280)
+        payload_width = int((item["total_motion_vector_payload_bytes"] / max_payload_bytes) * 280)
+        frame_width = int((item["frames_with_motion_side_data"] / max_side_data_frames) * 280)
         lines.extend(
             [
                 f"<text x='32' y='{bar_y}' font-family='monospace' font-size='16' fill='#1f2933'>{item['name']}</text>",
-                f"<rect x='240' y='{bar_y - 16}' width='{vector_width}' height='18' fill='{colors[index]}' />",
-                f"<text x='530' y='{bar_y - 2}' font-family='monospace' font-size='13' fill='#1f2933'>vectors: {item['total_vectors']}</text>",
-                f"<rect x='240' y='{bar_y + 14}' width='{magnitude_width}' height='18' fill='{colors[index]}' opacity='0.55' />",
-                f"<text x='530' y='{bar_y + 28}' font-family='monospace' font-size='13' fill='#1f2933'>mean magnitude: {item['mean_vector_magnitude']}</text>",
+                f"<rect x='240' y='{bar_y - 16}' width='{payload_width}' height='18' fill='{colors[index]}' />",
+                f"<text x='530' y='{bar_y - 2}' font-family='monospace' font-size='13' fill='#1f2933'>mv bytes: {item['total_motion_vector_payload_bytes']}</text>",
+                f"<rect x='240' y='{bar_y + 14}' width='{frame_width}' height='18' fill='{colors[index]}' opacity='0.55' />",
+                f"<text x='530' y='{bar_y + 28}' font-family='monospace' font-size='13' fill='#1f2933'>frames w/ mv side data: {item['frames_with_motion_side_data']}</text>",
             ]
         )
     lines.append("</svg>")
@@ -225,7 +403,8 @@ def write_status_report(
         "status": status,
         "blocked_by": blocked_by,
         "missing_tools": missing_tools or [],
-        "expected_command_surface": "scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json",
+        "expected_command_surface": "scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-155.json",
+        "docker_command_surface": "scripts/run_in_docker.sh run -- python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-155.json",
         "generated_at": utc_now(),
         "notes": notes or [],
         "details": details or {},
@@ -245,7 +424,10 @@ def write_status_report(
     if missing_tools:
         report_lines.append(f"- Missing tools: `{', '.join(missing_tools)}`")
     report_lines.append(
-        "- Command surface: `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json`"
+        "- Host command surface: `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-155.json`"
+    )
+    report_lines.append(
+        "- Docker command surface: `scripts/run_in_docker.sh run -- python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-155.json`"
     )
     if notes:
         report_lines.append("- Notes:")
@@ -260,7 +442,7 @@ def write_status_report(
     return report_path
 
 
-def run_baseline(manifest: dict[str, Any]) -> int:
+def run_baseline(manifest: dict[str, Any], *, progress_artifact: Path) -> int:
     paths = manifest["paths"]
     artifact_paths = {
         "vectors_dir": REPO_ROOT / paths["vectors_dir"],
@@ -270,10 +452,37 @@ def run_baseline(manifest: dict[str, Any]) -> int:
     }
     for path in artifact_paths.values():
         path.mkdir(parents=True, exist_ok=True)
+    estimated_total_frames = sum(
+        estimate_input_frame_count(input_spec) or 0 for input_spec in manifest["inputs"]
+    ) or None
+    shared_artifacts = {
+        "report_dir": str(artifact_paths["report_dir"].relative_to(REPO_ROOT)),
+        "vectors_dir": str(artifact_paths["vectors_dir"].relative_to(REPO_ROOT)),
+        "renders_dir": str(artifact_paths["renders_dir"].relative_to(REPO_ROOT)),
+        "comparison_dir": str(artifact_paths["comparison_dir"].relative_to(REPO_ROOT)),
+    }
+    write_progress_artifact(
+        progress_artifact,
+        status="starting",
+        current_step="resolving ffmpeg tooling for the public baseline rerun",
+        completed=0,
+        total=estimated_total_frames,
+        metrics={"inputs_total": len(manifest["inputs"])},
+        artifacts=shared_artifacts,
+    )
 
     try:
         ffmpeg_bin, ffprobe_bin = resolve_binary_paths(manifest)
     except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+        write_progress_artifact(
+            progress_artifact,
+            status="blocked",
+            current_step="ffmpeg bootstrap failed",
+            completed=0,
+            total=estimated_total_frames,
+            metrics={"error": str(exc)},
+            artifacts=shared_artifacts,
+        )
         write_status_report(
             manifest,
             artifact_paths["report_dir"],
@@ -285,20 +494,43 @@ def run_baseline(manifest: dict[str, Any]) -> int:
 
     per_input_summary: dict[str, dict[str, Any]] = {}
     command_log: list[dict[str, Any]] = []
+    processed_frames = 0
 
-    for input_spec in manifest["inputs"]:
-        ffprobe_output_path = artifact_paths["vectors_dir"] / f"{input_spec['name']}.ffprobe.json"
-        ffprobe_command = build_ffprobe_command(ffprobe_bin, input_spec)
-        ffprobe_result = run_command(ffprobe_command, capture=True)
-        ffprobe_output_path.write_text(ffprobe_result.stdout)
-        command_log.append({"step": "extract", "input": input_spec["name"], "command": ffprobe_command})
-
-        summary = summarize_ffprobe_frames(json.loads(ffprobe_result.stdout))
+    for index, input_spec in enumerate(manifest["inputs"], start=1):
+        extract_log_path = artifact_paths["vectors_dir"] / f"{input_spec['name']}.ffmpeg-showinfo.log"
+        extract_command = build_extract_command(ffmpeg_bin, input_spec)
+        command_log.append({"step": "extract", "input": input_spec["name"], "command": extract_command})
+        log_text = run_extract_command(
+            extract_command,
+            log_path=extract_log_path,
+            progress_path=progress_artifact,
+            input_name=input_spec["name"],
+            processed_frames_before=processed_frames,
+            total_frames=estimated_total_frames,
+            artifacts=shared_artifacts,
+        )
+        summary = summarize_ffmpeg_showinfo(log_text)
         summary["source_path"] = input_spec["raw_path"]
         summary["raw_sha256"] = input_spec.get("raw_sha256")
+        summary["showinfo_log"] = str(extract_log_path.relative_to(REPO_ROOT))
         summary_path = artifact_paths["vectors_dir"] / f"{input_spec['name']}.summary.json"
         summary_path.write_text(json.dumps(summary, indent=2) + "\n")
         per_input_summary[input_spec["name"]] = summary
+        processed_frames += summary["frame_count"]
+        write_progress_artifact(
+            progress_artifact,
+            status="running",
+            current_step=f"rendering codecview output for {input_spec['name']} ({index}/{len(manifest['inputs'])})",
+            completed=processed_frames,
+            total=estimated_total_frames,
+            metrics={
+                "input": input_spec["name"],
+                "frames_processed": processed_frames,
+                "frames_with_motion_side_data": summary["frames_with_motion_side_data"],
+                "motion_vector_payload_bytes": summary["total_motion_vector_payload_bytes"],
+            },
+            artifacts=shared_artifacts,
+        )
 
         render_path = artifact_paths["renders_dir"] / f"{input_spec['name']}.png"
         render_command = build_render_command(ffmpeg_bin, input_spec, render_path)
@@ -306,21 +538,60 @@ def run_baseline(manifest: dict[str, Any]) -> int:
         command_log.append({"step": "render", "input": input_spec["name"], "command": render_command})
 
     if sum(item["total_vectors"] for item in per_input_summary.values()) == 0:
-        had_motion_side_data = any(
-            item["frames_with_motion_side_data"] > 0 for item in per_input_summary.values()
+        had_motion_side_data = any(item["frames_with_motion_side_data"] > 0 for item in per_input_summary.values())
+        had_motion_vector_payload_bytes = any(
+            item["total_motion_vector_payload_bytes"] > 0 for item in per_input_summary.values()
+        )
+        blocked_by = "ffmpeg-export-side-data-mvs-cli-lacks-coordinate-vectors"
+        if not had_motion_side_data:
+            blocked_by = "ffmpeg-export-side-data-mvs-no-side-data"
+        elif not had_motion_vector_payload_bytes:
+            blocked_by = "ffmpeg-export-side-data-mvs-zero-payload-bytes"
+        comparison_summary = build_comparison_summary(per_input_summary)
+        comparison_summary["generated_at"] = utc_now()
+        comparison_summary["command_log"] = command_log
+        comparison_json_path = artifact_paths["comparison_dir"] / "summary.json"
+        comparison_json_path.write_text(json.dumps(comparison_summary, indent=2) + "\n")
+        comparison_svg_path = artifact_paths["comparison_dir"] / "summary.svg"
+        comparison_svg_path.write_text(build_comparison_svg(comparison_summary))
+        write_progress_artifact(
+            progress_artifact,
+            status="blocked",
+            current_step="ffmpeg decode path finished without coordinate-bearing vectors",
+            completed=processed_frames,
+            total=estimated_total_frames,
+            metrics={
+                "inputs_total": len(manifest["inputs"]),
+                "frames_with_motion_side_data": sum(
+                    item["frames_with_motion_side_data"] for item in per_input_summary.values()
+                ),
+                "motion_vector_payload_bytes": sum(
+                    item["total_motion_vector_payload_bytes"] for item in per_input_summary.values()
+                ),
+                "coordinate_vectors_available": False,
+            },
+            artifacts={
+                **shared_artifacts,
+                "comparison_json": str(comparison_json_path.relative_to(REPO_ROOT)),
+                "comparison_svg": str(comparison_svg_path.relative_to(REPO_ROOT)),
+            },
         )
         write_status_report(
             manifest,
             artifact_paths["report_dir"],
             status="blocked",
-            blocked_by="motion-vector-payload-missing" if had_motion_side_data else "motion-vectors-not-exported",
+            blocked_by=blocked_by,
             notes=[
-                "ffprobe completed for both public MP4 inputs",
+                "ffmpeg decode-path extraction completed for both public MP4 inputs",
                 "codecview render artifacts were written",
                 (
-                    "motion-vector side-data markers are present, but the ffprobe JSON payload does not include coordinate arrays"
-                    if had_motion_side_data
-                    else "no motion-vector side-data markers were exported for either public MP4 input"
+                    "motion-vector side-data bytes are present on the FFmpeg decode path, but the CLI still does not serialize coordinate-bearing vectors"
+                    if had_motion_vector_payload_bytes
+                    else (
+                        "motion-vector side-data markers are present, but the decode path reported zero payload bytes"
+                        if had_motion_side_data
+                        else "no motion-vector side-data markers were exported for either public MP4 input on the decode path"
+                    )
                 ),
             ],
             details={
@@ -329,6 +600,7 @@ def run_baseline(manifest: dict[str, Any]) -> int:
                     "frames_with_motion_side_data": summary["frames_with_motion_side_data"],
                     "frames_with_vectors": summary["frames_with_vectors"],
                     "total_vectors": summary["total_vectors"],
+                    "total_motion_vector_payload_bytes": summary["total_motion_vector_payload_bytes"],
                 }
                 for name, summary in per_input_summary.items()
             },
@@ -354,24 +626,40 @@ def run_baseline(manifest: dict[str, Any]) -> int:
             f"ffprobe bin: {ffprobe_bin}",
         ],
     )
+    write_progress_artifact(
+        progress_artifact,
+        status="success",
+        current_step="public baseline extraction and comparison completed",
+        completed=processed_frames,
+        total=estimated_total_frames,
+        metrics={
+            "inputs_total": len(manifest["inputs"]),
+            "total_vectors": sum(item["total_vectors"] for item in per_input_summary.values()),
+        },
+        artifacts={
+            **shared_artifacts,
+            "comparison_json": str(comparison_json_path.relative_to(REPO_ROOT)),
+            "comparison_svg": str(comparison_svg_path.relative_to(REPO_ROOT)),
+        },
+    )
 
     report_lines = [
         "# Public Baseline Report",
         "",
         f"- Run id: `{manifest['run_id']}`",
         "- Status: success",
-        "- Proven path: prepared public MP4 manifest -> ffprobe motion vectors -> codecview renders -> SVG comparison summary",
+        "- Proven path: prepared public MP4 manifest -> ffmpeg -export_side_data +mvs decode path -> codecview renders -> SVG comparison summary",
         f"- Input manifest: `{Path(paths['manifest_path']).name}`",
         "- Inputs:",
     ]
     for item in comparison_summary["inputs"]:
         report_lines.append(
-            f"  - `{item['name']}`: {item['total_vectors']} vectors across {item['frames_with_vectors']}/{item['frame_count']} frames; mean magnitude {item['mean_vector_magnitude']}"
+            f"  - `{item['name']}`: {item['total_motion_vector_payload_bytes']} motion-vector bytes across {item['frames_with_motion_side_data']}/{item['frame_count']} frames"
         )
     report_lines.extend(
         [
             "",
-            f"- Higher vector-count input: `{comparison_summary['higher_vector_count_input']}`",
+            f"- Higher motion-vector payload input: `{comparison_summary['higher_motion_vector_payload_input']}`",
             f"- Comparison JSON: `{comparison_json_path.relative_to(REPO_ROOT)}`",
             f"- Comparison SVG: `{comparison_svg_path.relative_to(REPO_ROOT)}`",
             f"- Status JSON: `{status_path.relative_to(REPO_ROOT)}`",
@@ -387,7 +675,9 @@ def print_plan(manifest: dict[str, Any]) -> int:
     plan = {
         "run_id": manifest["run_id"],
         "prepare_command": "scripts/prepare_public_inputs.sh",
-        "run_command": "python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json",
+        "run_command": "python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-155.json",
+        "docker_run_command": "scripts/run_in_docker.sh run -- python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-155.json",
+        "extractor_surface": "ffmpeg -export_side_data +mvs -vf showinfo",
         "inputs": [
             {
                 "name": input_spec["name"],
@@ -414,6 +704,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     for name in ("plan", "run"):
         subparser = subparsers.add_parser(name)
         subparser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+        if name == "run":
+            subparser.add_argument("--progress-artifact", type=Path, default=DEFAULT_PROGRESS_ARTIFACT)
 
     return parser.parse_args(argv)
 
@@ -423,7 +715,7 @@ def main(argv: list[str] | None = None) -> int:
     manifest = load_manifest(args.manifest)
     if args.command == "plan":
         return print_plan(manifest)
-    return run_baseline(manifest)
+    return run_baseline(manifest, progress_artifact=args.progress_artifact)
 
 
 if __name__ == "__main__":

@@ -63,6 +63,8 @@ class PublicBaselineTests(unittest.TestCase):
                 "frames_with_motion_side_data": 3,
                 "total_vectors": 40,
                 "mean_vector_magnitude": 2.5,
+                "total_motion_vector_payload_bytes": 400,
+                "mean_motion_vector_payload_bytes": 133.333333,
             },
             "input-b": {
                 "frame_count": 4,
@@ -70,16 +72,37 @@ class PublicBaselineTests(unittest.TestCase):
                 "frames_with_motion_side_data": 2,
                 "total_vectors": 10,
                 "mean_vector_magnitude": 1.25,
+                "total_motion_vector_payload_bytes": 100,
+                "mean_motion_vector_payload_bytes": 50.0,
             },
         }
 
         comparison = public_baseline.build_comparison_summary(per_input)
         svg = public_baseline.build_comparison_svg(comparison)
 
-        self.assertEqual(comparison["higher_vector_count_input"], "input-a")
+        self.assertEqual(comparison["higher_motion_vector_payload_input"], "input-a")
         self.assertEqual(comparison["delta"]["vector_count"], 30)
+        self.assertEqual(comparison["delta"]["motion_vector_payload_bytes"], 300)
         self.assertIn("input-a", svg)
-        self.assertIn("vectors: 40", svg)
+        self.assertIn("mv bytes: 400", svg)
+
+    def test_summarize_ffmpeg_showinfo_tracks_payload_bytes(self) -> None:
+        log_text = """
+[Parsed_showinfo_0 @ 0x1] n:   0 pts:      0 pts_time:0 duration:    512 duration_time:0.0416667 fmt:yuv420p cl:left sar:1/1 s:854x480 i:P iskey:1 type:I checksum:ABC
+[Parsed_showinfo_0 @ 0x1] n:   1 pts:    512 pts_time:0.0416667 duration:    512 duration_time:0.0416667 fmt:yuv420p cl:left sar:1/1 s:854x480 i:P iskey:0 type:P checksum:DEF
+[Parsed_showinfo_0 @ 0x1]   side data - Motion vectors: (129600 bytes)
+[Parsed_showinfo_0 @ 0x1] n:   2 pts:   1024 pts_time:0.0833333 duration:    512 duration_time:0.0416667 fmt:yuv420p cl:left sar:1/1 s:854x480 i:P iskey:0 type:B checksum:GHI
+[Parsed_showinfo_0 @ 0x1]   side data - Motion vectors: (110680 bytes)
+""".strip()
+
+        summary = public_baseline.summarize_ffmpeg_showinfo(log_text)
+
+        self.assertEqual(summary["frame_count"], 3)
+        self.assertEqual(summary["frames_with_motion_side_data"], 2)
+        self.assertEqual(summary["total_motion_vector_payload_bytes"], 240280)
+        self.assertEqual(summary["max_motion_vector_payload_bytes"], 129600)
+        self.assertFalse(summary["coordinate_vectors_available"])
+        self.assertEqual(summary["frames"][1]["motion_vector_payload_bytes"], 129600)
 
     def test_run_baseline_writes_blocked_report_when_bootstrap_fails(self) -> None:
         manifest = {
@@ -109,7 +132,10 @@ class PublicBaselineTests(unittest.TestCase):
             repo_root = Path(tmp_dir)
             with mock.patch.object(public_baseline, "REPO_ROOT", repo_root):
                 with mock.patch("scripts.public_baseline.run_command", side_effect=FileNotFoundError("missing ffmpeg")):
-                    exit_code = public_baseline.run_baseline(manifest)
+                    exit_code = public_baseline.run_baseline(
+                        manifest,
+                        progress_artifact=repo_root / ".symphony" / "progress" / "HEL-155.json",
+                    )
 
             self.assertEqual(exit_code, 2)
             status_path = repo_root / "reports" / "out" / "public-baseline" / "status.json"
@@ -140,6 +166,7 @@ class PublicBaselineTests(unittest.TestCase):
 
         written = "".join(call.args[0] for call in mock_write.call_args_list)
         self.assertIn("scripts/prepare_public_inputs.sh", written)
+        self.assertIn("scripts/run_in_docker.sh run -- python3 scripts/public_baseline.py run", written)
         self.assertIn("/tmp/a.mp4", written)
 
 

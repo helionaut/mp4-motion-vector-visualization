@@ -1,0 +1,107 @@
+{
+  "inputs": [
+    {
+      "name": "bbb_480p_30s",
+      "total_vectors": 0,
+      "mean_vector_magnitude": 0.0,
+      "frames_with_vectors": 0,
+      "frames_with_motion_side_data": 714,
+      "frame_count": 720,
+      "total_motion_vector_payload_bytes": 66011680,
+      "mean_motion_vector_payload_bytes": 92453.333333
+    },
+    {
+      "name": "bbb_1080p_30s",
+      "total_vectors": 0,
+      "mean_vector_magnitude": 0.0,
+      "frames_with_vectors": 0,
+      "frames_with_motion_side_data": 714,
+      "frame_count": 720,
+      "total_motion_vector_payload_bytes": 337375720,
+      "mean_motion_vector_payload_bytes": 472515.014006
+    }
+  ],
+  "delta": {
+    "vector_count": 0,
+    "mean_vector_magnitude": 0.0,
+    "motion_vector_payload_bytes": -271364040
+  },
+  "higher_motion_vector_payload_input": "bbb_1080p_30s",
+  "generated_at": "2026-04-02T19:22:34+00:00",
+  "command_log": [
+    {
+      "step": "extract",
+      "input": "bbb_480p_30s",
+      "command": [
+        "/home/helionaut/srv/research-cache/18afd661ce11/toolchains/ffmpeg-johnvansickle-static/ffmpeg",
+        "-hide_banner",
+        "-export_side_data",
+        "+mvs",
+        "-i",
+        "/home/helionaut/srv/research-cache/18afd661ce11/datasets/public/raw/public-baseline/big-buck-bunny-480p-30sec.mp4",
+        "-an",
+        "-vf",
+        "showinfo",
+        "-f",
+        "null",
+        "-"
+      ]
+    },
+    {
+      "step": "render",
+      "input": "bbb_480p_30s",
+      "command": [
+        "/home/helionaut/srv/research-cache/18afd661ce11/toolchains/ffmpeg-johnvansickle-static/ffmpeg",
+        "-y",
+        "-export_side_data",
+        "+mvs",
+        "-i",
+        "/home/helionaut/srv/research-cache/18afd661ce11/datasets/public/raw/public-baseline/big-buck-bunny-480p-30sec.mp4",
+        "-vf",
+        "codecview=mv=pf+bf+bb,select='gte(n,1)'",
+        "-frames:v",
+        "1",
+        "-update",
+        "1",
+        "/home/helionaut/workspaces/HEL-155/reports/out/public-baseline/renders/bbb_480p_30s.png"
+      ]
+    },
+    {
+      "step": "extract",
+      "input": "bbb_1080p_30s",
+      "command": [
+        "/home/helionaut/srv/research-cache/18afd661ce11/toolchains/ffmpeg-johnvansickle-static/ffmpeg",
+        "-hide_banner",
+        "-export_side_data",
+        "+mvs",
+        "-i",
+        "/home/helionaut/srv/research-cache/18afd661ce11/datasets/public/raw/public-baseline/big-buck-bunny-1080p-30sec.mp4",
+        "-an",
+        "-vf",
+        "showinfo",
+        "-f",
+        "null",
+        "-"
+      ]
+    },
+    {
+      "step": "render",
+      "input": "bbb_1080p_30s",
+      "command": [
+        "/home/helionaut/srv/research-cache/18afd661ce11/toolchains/ffmpeg-johnvansickle-static/ffmpeg",
+        "-y",
+        "-export_side_data",
+        "+mvs",
+        "-i",
+        "/home/helionaut/srv/research-cache/18afd661ce11/datasets/public/raw/public-baseline/big-buck-bunny-1080p-30sec.mp4",
+        "-vf",
+        "codecview=mv=pf+bf+bb,select='gte(n,1)'",
+        "-frames:v",
+        "1",
+        "-update",
+        "1",
+        "/home/helionaut/workspaces/HEL-155/reports/out/public-baseline/renders/bbb_1080p_30s.png"
+      ]
+    }
+  ]
+}

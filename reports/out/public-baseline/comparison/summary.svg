@@ -1,0 +1,14 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='720' height='260' viewBox='0 0 720 260'>
+<rect width='720' height='260' fill='#f7f4ea' />
+<text x='32' y='40' font-family='monospace' font-size='20' fill='#1f2933'>FFmpeg export_side_data MVS Comparison</text>
+<text x='32' y='70' font-family='monospace' font-size='16' fill='#1f2933'>bbb_480p_30s</text>
+<rect x='240' y='54' width='54' height='18' fill='#2563eb' />
+<text x='530' y='68' font-family='monospace' font-size='13' fill='#1f2933'>mv bytes: 66011680</text>
+<rect x='240' y='84' width='280' height='18' fill='#2563eb' opacity='0.55' />
+<text x='530' y='98' font-family='monospace' font-size='13' fill='#1f2933'>frames w/ mv side data: 714</text>
+<text x='32' y='160' font-family='monospace' font-size='16' fill='#1f2933'>bbb_1080p_30s</text>
+<rect x='240' y='144' width='280' height='18' fill='#dc2626' />
+<text x='530' y='158' font-family='monospace' font-size='13' fill='#1f2933'>mv bytes: 337375720</text>
+<rect x='240' y='174' width='280' height='18' fill='#dc2626' opacity='0.55' />
+<text x='530' y='188' font-family='monospace' font-size='13' fill='#1f2933'>frames w/ mv side data: 714</text>
+</svg>
