@@ -62,7 +62,7 @@
   "paths": {
     "comparison_dir": "reports/out/public-baseline/comparison",
     "datasets_root": "/home/helionaut/srv/research-cache/18afd661ce11/datasets",
-    "manifest_path": "/home/helionaut/workspaces/HEL-151/manifests/public-baseline.json",
+    "manifest_path": "/home/helionaut/workspaces/HEL-152/manifests/public-baseline.json",
     "private_prepared_dir": "/home/helionaut/srv/research-cache/18afd661ce11/datasets/user/prepared/public-baseline",
     "private_raw_dir": "/home/helionaut/srv/research-cache/18afd661ce11/datasets/user/raw/public-baseline",
     "public_prepared_dir": "/home/helionaut/srv/research-cache/18afd661ce11/datasets/public/prepared/public-baseline",

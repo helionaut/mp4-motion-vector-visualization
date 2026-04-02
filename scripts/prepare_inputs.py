@@ -106,6 +106,40 @@ def summarize_probe(probe: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def raw_dir_for_visibility(layout: Layout, visibility: str) -> Path:
+    if visibility == "private":
+        return layout.private_raw_dir
+    return layout.public_raw_dir
+
+
+def prepared_dir_for_visibility(layout: Layout, visibility: str) -> Path:
+    if visibility == "private":
+        return layout.private_prepared_dir
+    return layout.public_prepared_dir
+
+
+def stage_input(source: dict[str, Any], raw_dir: Path) -> Path:
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    raw_path = raw_dir / source["filename"]
+
+    source_url = source.get("source_url")
+    local_path = source.get("local_path")
+
+    if source_url:
+        ensure_file(source_url, raw_path)
+        return raw_path
+
+    if local_path:
+        local_file = Path(local_path)
+        if not local_file.is_file():
+            raise FileNotFoundError(f"Local input path does not exist: {local_file}")
+        if local_file.resolve() != raw_path.resolve():
+            shutil.copy2(local_file, raw_path)
+        return raw_path
+
+    raise ValueError(f"Input {source['name']} must define either source_url or local_path")
+
+
 def make_manifest(
     *,
     config: dict[str, Any],
@@ -113,13 +147,14 @@ def make_manifest(
     ffprobe_bin: str,
     manifest_path: Path,
 ) -> dict[str, Any]:
-    prepared_probe_dir = layout.public_prepared_dir / "probe"
-    prepared_probe_dir.mkdir(parents=True, exist_ok=True)
-
     inputs: list[dict[str, Any]] = []
     for source in config["inputs"]:
-        raw_path = layout.public_raw_dir / source["filename"]
-        ensure_file(source["source_url"], raw_path)
+        visibility = source.get("visibility", config["visibility"])
+        raw_dir = raw_dir_for_visibility(layout, visibility)
+        prepared_probe_dir = prepared_dir_for_visibility(layout, visibility) / "probe"
+        prepared_probe_dir.mkdir(parents=True, exist_ok=True)
+
+        raw_path = stage_input(source, raw_dir)
         probe = probe_file(ffprobe_bin, raw_path)
         probe_path = prepared_probe_dir / f"{source['name']}.ffprobe.json"
         probe_path.write_text(json.dumps(probe, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -129,9 +164,9 @@ def make_manifest(
                 "name": source["name"],
                 "visibility": source["visibility"],
                 "filename": source["filename"],
-                "source_url": source["source_url"],
-                "source_page_url": config["source_page_url"],
-                "license_url": config["license_url"],
+                "source_url": source.get("source_url"),
+                "source_page_url": config.get("source_page_url"),
+                "license_url": config.get("license_url"),
                 "provenance": source["provenance"],
                 "notes": source["notes"],
                 "raw_path": str(raw_path),

@@ -24,6 +24,21 @@ REQUIRED_FILES = {
         "## Shared cache contract",
         "## Validation and handoff proof",
     ],
+    "scripts/bootstrap_media_tools.sh": [
+        "ARCHIVE_URL",
+        "FFPROBE_PATH",
+        "FFMPEG_PATH",
+    ],
+    "scripts/prepare_private_inputs.sh": [
+        "bootstrap_media_tools.sh",
+        "private-template.json",
+        "prepare_inputs.py",
+    ],
+    "scripts/run_private_validation.sh": [
+        "prepare_private_inputs.sh",
+        "public_baseline.py",
+        "user-validation.json",
+    ],
 }
 
 
@@ -92,6 +107,20 @@ def main() -> int:
         require("docker build" in dry_output, "dry-run: missing docker build command", errors)
         require("docker run" in dry_output, "dry-run: missing docker run command", errors)
         require("/cache-root/downloads" in dry_output, "dry-run: missing cache mount environment", errors)
+
+    for executable_relpath in (
+        "scripts/bootstrap_media_tools.sh",
+        "scripts/prepare_private_inputs.sh",
+        "scripts/run_private_validation.sh",
+    ):
+        executable_path = repo_root / executable_relpath
+        if executable_path.is_file():
+            mode = executable_path.stat().st_mode
+            require(
+                bool(mode & stat.S_IXUSR),
+                f"{executable_relpath}: expected the wrapper to be executable",
+                errors,
+            )
 
     if errors:
         for line in errors:

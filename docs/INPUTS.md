@@ -57,6 +57,35 @@ cache under:
 The private lane should reuse the same manifest shape created here, replacing
 public `source_url` fields with secure provenance notes.
 
+Repo-local private manifest template:
+
+- template config: `configs/input_sets/private-template.json`
+- private staging wrapper: `scripts/prepare_private_inputs.sh`
+- private validation wrapper: `scripts/run_private_validation.sh`
+
+When the user MP4 pair becomes available, stage the manifest with:
+
+```bash
+scripts/run_private_validation.sh
+```
+
+What this private flow does:
+
+1. reads `local_path` entries instead of public `source_url` downloads
+2. fails early with `python3 scripts/validate_private_input_config.py --config ...` when the private config still points at placeholder or missing local files, and writes that blocker to `.symphony/progress/HEL-152.json`
+3. bootstraps a reusable static `ffprobe`/`ffmpeg` toolchain under `/home/helionaut/srv/research-cache/18afd661ce11/toolchains/` if it is not already cached
+4. copies the staged user MP4 files into `/home/helionaut/srv/research-cache/18afd661ce11/datasets/user/raw/<run-id>/`
+5. writes ffprobe sidecars into `/home/helionaut/srv/research-cache/18afd661ce11/datasets/user/prepared/<run-id>/probe/`
+6. emits a manifest with the same downstream shape as the public lane, but with `source_url: null`
+7. runs `python3 scripts/public_baseline.py run --manifest manifests/user-validation.json` against that staged private manifest
+
+Override notes:
+
+- `MP4_MV_PRIVATE_INPUT_CONFIG` can point to a non-default private config file
+- `MP4_MV_PRIVATE_MANIFEST_OUT` can change the output manifest path
+- `MP4_MV_PROGRESS_ARTIFACT` can redirect the machine-readable blocker/ready artifact when the wrapper is used outside the default issue workspace
+- `scripts/prepare_private_inputs.sh` is still available when only the staging step is needed without immediately running the lane
+
 ## Prepared Artifacts
 
 The downstream workflow should consume these prepared artifacts:
@@ -86,8 +115,11 @@ The downstream workflow should consume these prepared artifacts:
 
 Repo-local control files:
 - input catalog: `configs/input_sets/public-baseline.json`
+- private input template: `configs/input_sets/private-template.json`
 - manifest generator: `scripts/prepare_inputs.py`
 - public baseline wrapper: `scripts/prepare_public_inputs.sh`
+- private staging wrapper: `scripts/prepare_private_inputs.sh`
+- private validation wrapper: `scripts/run_private_validation.sh`
 - media-tools bootstrap: `scripts/bootstrap_media_tools.sh`
 - generated manifest: `manifests/public-baseline.json`
 
