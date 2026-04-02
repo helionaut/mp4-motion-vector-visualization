@@ -60,11 +60,12 @@ Repo-local private manifest template:
 
 - template config: `configs/input_sets/private-template.json`
 - private staging wrapper: `scripts/prepare_private_inputs.sh`
+- private validation wrapper: `scripts/run_private_validation.sh`
 
 When the user MP4 pair becomes available, stage the manifest with:
 
 ```bash
-scripts/prepare_private_inputs.sh
+scripts/run_private_validation.sh
 ```
 
 What this private flow does:
@@ -74,11 +75,13 @@ What this private flow does:
 3. copies the staged user MP4 files into `/home/helionaut/srv/research-cache/18afd661ce11/datasets/user/raw/<run-id>/`
 4. writes ffprobe sidecars into `/home/helionaut/srv/research-cache/18afd661ce11/datasets/user/prepared/<run-id>/probe/`
 5. emits a manifest with the same downstream shape as the public lane, but with `source_url: null`
+6. runs `python3 scripts/public_baseline.py run --manifest manifests/user-validation.json` against that staged private manifest
 
 Override notes:
 
 - `MP4_MV_PRIVATE_INPUT_CONFIG` can point to a non-default private config file
 - `MP4_MV_PRIVATE_MANIFEST_OUT` can change the output manifest path
+- `scripts/prepare_private_inputs.sh` is still available when only the staging step is needed without immediately running the lane
 
 ## Prepared Artifacts
 
@@ -113,6 +116,7 @@ Repo-local control files:
 - manifest generator: `scripts/prepare_inputs.py`
 - public baseline wrapper: `scripts/prepare_public_inputs.sh`
 - private staging wrapper: `scripts/prepare_private_inputs.sh`
+- private validation wrapper: `scripts/run_private_validation.sh`
 - media-tools bootstrap: `scripts/bootstrap_media_tools.sh`
 - generated manifest: `manifests/public-baseline.json`
 

@@ -34,6 +34,11 @@ REQUIRED_FILES = {
         "private-template.json",
         "prepare_inputs.py",
     ],
+    "scripts/run_private_validation.sh": [
+        "prepare_private_inputs.sh",
+        "public_baseline.py",
+        "user-validation.json",
+    ],
 }
 
 
@@ -106,6 +111,7 @@ def main() -> int:
     for executable_relpath in (
         "scripts/bootstrap_media_tools.sh",
         "scripts/prepare_private_inputs.sh",
+        "scripts/run_private_validation.sh",
     ):
         executable_path = repo_root / executable_relpath
         if executable_path.is_file():
