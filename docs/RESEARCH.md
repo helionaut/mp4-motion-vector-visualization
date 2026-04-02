@@ -13,7 +13,7 @@ Build a research workflow to ingest two MP4 files, extract codec motion vectors,
 
 ## Reusable baseline
 
-- Known-good public baseline: not established yet; HEL-151 now publishes a reusable harness branch and draft PR, and its latest workpad says a rerun on prepared public inputs reached a stronger failure boundary (`motion-vectors-not-exported`) after renders were produced, but that result is not yet reflected in the published branch/PR as a truthful successful extractor/render proof
+- Known-good public baseline: a truthful public success proof is still not established, but HEL-151 now publishes a reusable stronger failure boundary in PR #5: `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json` writes render artifacts for both public MP4 inputs and ends at `motion-vector-payload-missing` with 714 frames of motion-vector side-data markers but zero exported vectors per input
 - Known-good private/user-data baseline: not established yet; HEL-152 should not rerun on private data until the public baseline above becomes credible and reusable
 - Reusable build/tooling baseline: repo-local Dockerfile plus `scripts/run_in_docker.sh` with shared cache mounts; live container proof still requires a Docker-capable host
 - Shared cache root: `/home/helionaut/srv/research-cache/18afd661ce11`

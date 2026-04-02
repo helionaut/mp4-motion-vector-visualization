@@ -9,7 +9,7 @@ HEL-152 is the private-data validation lane. It only makes sense after HEL-151 l
 
 ## Tactical result from this pass
 
-This pass stopped before any private-data rerun because the prerequisite public baseline is still missing as a reusable proof.
+This pass confirmed that HEL-151 now publishes a reusable public failure boundary, but a truthful public success proof still does not exist and the current machine still cannot run the lane locally.
 
 ## What was checked
 
@@ -22,18 +22,19 @@ This pass stopped before any private-data rerun because the prerequisite public 
 ## Findings
 
 1. HEL-151 is still `In Progress`.
-2. HEL-151 now has a published remote branch and draft PR #5 (`Establish public known-good MP4 baseline harness`).
-3. PR #5 still says the shipped proof is only a minimal reproducible failure on a host without `docker`, `ffmpeg`, or `ffprobe`; its published head is still commit `a6df7a41ace77ce7d219db456013086b14e0eae5`, and its committed report at `reports/out/public-known-good-baseline/report.md` still says the baseline is blocked on missing runtime binaries.
-4. HEL-151's latest Linear workpad update says a newer rerun succeeded far enough to prepare public inputs and produce renders, but then stopped on `motion-vectors-not-exported` for both agreed public MP4 samples. That stronger failure boundary is not yet published in the HEL-151 branch or PR.
-5. The shared cache currently contains the prepared public raw inputs, but no published vector/comparison artifacts for a successful public baseline and no `datasets/user/` tree.
-6. The current machine still has no `docker`, `ffmpeg`, or `ffprobe` binary on the host path, so it cannot independently confirm or extend the newer HEL-151 rerun result locally.
+2. HEL-151 now has a published remote branch and draft PR #5 (`Reproduce public MP4 baseline extractor failure`) at head `34cd50a32f7c7e0c3a6c20f5d7dc864a11d50a53`.
+3. PR #5 now publishes a stronger reusable public failure boundary instead of the older missing-runtime-only report.
+4. Its committed `reports/out/public-baseline/status.json` records `motion-vector-payload-missing` with the exact command surface `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json`.
+5. The committed report says both public inputs produced render artifacts and `ffprobe` side-data markers on 714 frames each, but zero exported motion-vector payload coordinates.
+6. A truthful public success baseline still does not exist, and there is still no `datasets/user/` tree for HEL-152 to run against.
+7. The current machine still has no `docker`, `ffmpeg`, or `ffprobe` binary on the host path, so it cannot independently confirm or extend the published HEL-151 failure boundary locally.
 
 ## Experiment contract for the next pass
 
-- Changed variable: public baseline proof availability
-- Hypothesis: once HEL-151 publishes either a truthful successful public extraction/render proof or a committed stronger minimal reproducible failure around `motion-vectors-not-exported`, HEL-152 can reuse that exact surface and isolate the next private-data-specific blocker cleanly
-- Success criterion: the published HEL-151 branch or PR includes the current deterministic command, the actual latest artifacts or failure report, and a truthful validation record from infrastructure that can actually run the lane
-- Abort condition: if HEL-151's latest rerun evidence remains unpublished or still cannot reach a truthful public proof boundary, stop the private lane again and keep the blocker on the public baseline rather than mixing in private-data debugging
+- Changed variable: input visibility
+- Hypothesis: rerunning the now-published public failure boundary on user MP4s will show whether `motion-vector-payload-missing` is specific to the public Big Buck Bunny pair or reproduces on private inputs too
+- Success criterion: a private-data rerun uses HEL-151's published command surface unchanged, records whether user files also expose side-data markers with zero vectors, and leaves comparable status/report artifacts
+- Abort condition: if the current machine still cannot execute the required toolchain or the user dataset is still absent, stop again and keep the blocker on infrastructure/input availability rather than inventing a different lane
 
 ## Reuse from previous work
 
@@ -41,8 +42,10 @@ This pass stopped before any private-data rerun because the prerequisite public 
 - environment contract: `docs/ENVIRONMENT.md`
 - public input contract and manifest shape: `docs/INPUTS.md`, `scripts/prepare_inputs.py`, `manifests/public-baseline.json`
 - shared cache root: `/home/helionaut/srv/research-cache/18afd661ce11`
-- HEL-151 draft PR #5, its committed blocked-run report in `reports/out/public-known-good-baseline/`, and HEL-151 workpad update 06 for the newer `motion-vectors-not-exported` failure boundary
+- HEL-151 draft PR #5 at `34cd50a32f7c7e0c3a6c20f5d7dc864a11d50a53`
+- committed public failure artifacts in `reports/out/public-baseline/`
+- public command surface: `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json`
 
 ## Next recommended slice
 
-Finish HEL-151 on infrastructure that can actually run the container or equivalent FFmpeg toolchain, publish the newer rerun result now recorded in its workpad, and either turn PR #5 into a truthful successful baseline proof or a committed stronger failure report around `motion-vectors-not-exported` that HEL-152 can reuse unchanged on private inputs.
+Provision runnable infrastructure plus the actual user MP4 pair for HEL-152, then reuse HEL-151's published public command surface unchanged to determine whether private inputs also hit `motion-vector-payload-missing` or expose a different blocker.
