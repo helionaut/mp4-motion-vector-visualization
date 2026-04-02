@@ -1,0 +1,21 @@
+{
+  "issue": "HEL-147",
+  "sha": "a1423018e605b6c12295484849ca97597a9af799",
+  "branch": "eugeniy/hel-147-project-intake-mp4-motion-vector-visualization",
+  "command": "python3 scripts/validate_intake_docs.py && git diff --check",
+  "success": true,
+  "completed_at": "2026-04-02T17:44:21.681007+00:00",
+  "artifacts": [
+    "scripts/validate_intake_docs.py",
+    ".github/workflows/intake-docs-ci.yml",
+    "docs/PLAN.md",
+    "docs/RESEARCH.md",
+    "docs/ENVIRONMENT.md",
+    "docs/INPUTS.md",
+    "README.md"
+  ],
+  "screenshots_reviewed": [
+    "not-applicable-docs-only"
+  ],
+  "notes": null
+}

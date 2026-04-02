@@ -1,0 +1,19 @@
+{
+  "issue": "HEL-147",
+  "goal": "Translate the intake into an executable research plan for MP4 motion vector extraction and comparison.",
+  "definition_of_done": "Project scope is clear; initial issue pack is coherent; first next actions for Symphony are obvious.",
+  "current_phase": "blocked-on-remote-review-gate",
+  "most_important_next_action": "Clarify whether docs-only planning tickets may advance without GitHub checks or add a baseline CI workflow before moving HEL-147 out of In Progress.",
+  "request_summary": "Turn the MP4 motion-vector intake into a concrete execution plan.",
+  "delivery_summary": "Published the intake execution plan and aligned the core research/environment/input docs.",
+  "main_difficulty": "The intake plan itself is complete, but the PR cannot satisfy the current review gate because this repo has no GitHub Actions workflows and therefore no remote checks.",
+  "next_step_summary": "Decide whether to accept the docs-only PR without CI or add a minimal remote check so the issue can move to review cleanly.",
+  "publish_required": false,
+  "last_green_validation_sha": "a1423018e605b6c12295484849ca97597a9af799",
+  "last_green_validation_at": "2026-04-02T17:35:45.876850+00:00",
+  "pr_url": "https://github.com/helionaut/mp4-motion-vector-visualization/pull/2",
+  "blocked_by": [
+    "remote-ci-checks-not-configured"
+  ],
+  "updated_at": "2026-04-02T17:43:10.000000+00:00"
+}
