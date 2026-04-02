@@ -1,1 +1,3 @@
 .symphony/
+__pycache__/
+*.pyc
