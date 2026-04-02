@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Run or plan the public known-good motion-vector baseline."""
+"""Run or plan the public motion-vector baseline."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import math
-import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -15,7 +14,7 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_MANIFEST = REPO_ROOT / "manifests" / "public_known_good_baseline.json"
+DEFAULT_MANIFEST = REPO_ROOT / "manifests" / "public-baseline.json"
 
 
 def utc_now() -> str:
@@ -24,17 +23,13 @@ def utc_now() -> str:
 
 def load_manifest(manifest_path: Path) -> dict[str, Any]:
     data = json.loads(manifest_path.read_text())
-    required_top_level = {"run_id", "inputs", "artifacts"}
+    required_top_level = {"run_id", "inputs", "paths", "tooling"}
     missing = required_top_level - set(data)
     if missing:
         raise ValueError(f"manifest missing required keys: {sorted(missing)}")
     if len(data["inputs"]) != 2:
         raise ValueError("manifest must define exactly two inputs")
     return data
-
-
-def resolve_repo_path(relative_path: str) -> Path:
-    return REPO_ROOT / relative_path
 
 
 def ensure_parent(path: Path) -> None:
@@ -51,34 +46,26 @@ def run_command(command: list[str], *, capture: bool = False) -> subprocess.Comp
     )
 
 
-def build_generation_command(input_spec: dict[str, Any]) -> list[str]:
-    generator = input_spec["generator"]
-    output_path = resolve_repo_path(input_spec["relative_output_path"])
-    return [
-        "ffmpeg",
-        "-y",
-        "-f",
-        "lavfi",
-        "-i",
-        generator["video_filter"],
-        "-an",
-        "-c:v",
-        generator["codec"],
-        "-pix_fmt",
-        generator["pixel_format"],
-        "-g",
-        str(generator["gop_size"]),
-        "-bf",
-        str(generator["bf"]),
-        "-r",
-        str(generator["frame_rate"]),
-        str(output_path),
-    ]
+def resolve_binary_paths(manifest: dict[str, Any]) -> tuple[Path, Path]:
+    ffprobe_bin = Path(manifest["tooling"].get("ffprobe_bin", ""))
+    ffmpeg_bin = ffprobe_bin.with_name("ffmpeg") if ffprobe_bin else Path()
+    if ffprobe_bin.is_file() and ffmpeg_bin.is_file():
+        return ffmpeg_bin, ffprobe_bin
+
+    bootstrap_cmd = [str(REPO_ROOT / "scripts" / "bootstrap_media_tools.sh")]
+    result = run_command(bootstrap_cmd, capture=True)
+    ffprobe_bin = Path(result.stdout.strip())
+    ffmpeg_bin = ffprobe_bin.with_name("ffmpeg")
+    if not ffprobe_bin.is_file() or not ffmpeg_bin.is_file():
+        raise FileNotFoundError(
+            f"expected ffmpeg and ffprobe beside {ffprobe_bin}, but bootstrap did not produce them"
+        )
+    return ffmpeg_bin, ffprobe_bin
 
 
-def build_ffprobe_command(input_spec: dict[str, Any], output_path: Path) -> list[str]:
+def build_ffprobe_command(ffprobe_bin: Path, input_spec: dict[str, Any]) -> list[str]:
     return [
-        "ffprobe",
+        str(ffprobe_bin),
         "-v",
         "error",
         "-flags2",
@@ -90,21 +77,23 @@ def build_ffprobe_command(input_spec: dict[str, Any], output_path: Path) -> list
         "frame=best_effort_timestamp_time,pict_type,side_data_list",
         "-of",
         "json",
-        str(resolve_repo_path(input_spec["relative_output_path"])),
+        input_spec["raw_path"],
     ]
 
 
-def build_render_command(input_spec: dict[str, Any], output_path: Path) -> list[str]:
+def build_render_command(ffmpeg_bin: Path, input_spec: dict[str, Any], output_path: Path) -> list[str]:
     return [
-        "ffmpeg",
+        str(ffmpeg_bin),
         "-y",
         "-flags2",
         "+export_mvs",
         "-i",
-        str(resolve_repo_path(input_spec["relative_output_path"])),
+        input_spec["raw_path"],
         "-vf",
         "codecview=mv=pf+bf+bb,select='gte(n,1)'",
         "-frames:v",
+        "1",
+        "-update",
         "1",
         str(output_path),
     ]
@@ -116,11 +105,15 @@ def summarize_ffprobe_frames(ffprobe_doc: dict[str, Any]) -> dict[str, Any]:
     total_vectors = 0
     total_magnitude = 0.0
     frames_with_vectors = 0
+    frames_with_motion_side_data = 0
 
     for index, frame in enumerate(frames):
         vectors: list[dict[str, Any]] = []
+        has_motion_side_data = False
         for side_data in frame.get("side_data_list", []):
             if side_data.get("side_data_type") == "Motion vectors":
+                has_motion_side_data = True
+                frames_with_motion_side_data += 1
                 vectors.extend(side_data.get("motion_vectors", []))
 
         vector_count = len(vectors)
@@ -136,6 +129,7 @@ def summarize_ffprobe_frames(ffprobe_doc: dict[str, Any]) -> dict[str, Any]:
             "timestamp": frame.get("best_effort_timestamp_time"),
             "pict_type": frame.get("pict_type"),
             "vector_count": vector_count,
+            "motion_vector_side_data_present": has_motion_side_data,
             "average_magnitude": round(average_magnitude, 6),
         }
         frame_summaries.append(frame_summary)
@@ -148,6 +142,7 @@ def summarize_ffprobe_frames(ffprobe_doc: dict[str, Any]) -> dict[str, Any]:
     return {
         "frame_count": len(frames),
         "frames_with_vectors": frames_with_vectors,
+        "frames_with_motion_side_data": frames_with_motion_side_data,
         "total_vectors": total_vectors,
         "mean_vector_magnitude": round(mean_vector_magnitude, 6),
         "frames": frame_summaries,
@@ -163,6 +158,7 @@ def build_comparison_summary(per_input: dict[str, dict[str, Any]]) -> dict[str, 
                 "total_vectors": summary["total_vectors"],
                 "mean_vector_magnitude": summary["mean_vector_magnitude"],
                 "frames_with_vectors": summary["frames_with_vectors"],
+                "frames_with_motion_side_data": summary["frames_with_motion_side_data"],
                 "frame_count": summary["frame_count"],
             }
         )
@@ -214,75 +210,130 @@ def build_comparison_svg(comparison_summary: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def write_failure_report(manifest: dict[str, Any], missing_tools: list[str], report_dir: Path) -> Path:
+def write_status_report(
+    manifest: dict[str, Any],
+    report_dir: Path,
+    *,
+    status: str,
+    blocked_by: str | None = None,
+    notes: list[str] | None = None,
+    missing_tools: list[str] | None = None,
+    details: dict[str, Any] | None = None,
+) -> Path:
     report = {
         "run_id": manifest["run_id"],
-        "status": "blocked",
-        "blocked_by": "missing-runtime-binaries",
-        "missing_tools": missing_tools,
-        "expected_command_surface": "scripts/run_in_docker.sh run -- python3 scripts/public_baseline.py run",
+        "status": status,
+        "blocked_by": blocked_by,
+        "missing_tools": missing_tools or [],
+        "expected_command_surface": "scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json",
         "generated_at": utc_now(),
+        "notes": notes or [],
+        "details": details or {},
     }
     report_path = report_dir / "status.json"
     ensure_parent(report_path)
     report_path.write_text(json.dumps(report, indent=2) + "\n")
-
     markdown_path = report_dir / "report.md"
-    markdown_path.write_text(
-        "\n".join(
-            [
-                "# Public Known-Good Baseline Report",
-                "",
-                f"- Run id: `{manifest['run_id']}`",
-                "- Status: blocked on missing runtime binaries in the current host workspace",
-                f"- Missing tools: `{', '.join(missing_tools)}`",
-                "- Reproduction command once Docker is available:",
-                "  `scripts/run_in_docker.sh run -- python3 scripts/public_baseline.py run --manifest manifests/public_known_good_baseline.json`",
-                "",
-                "This failure is expected on hosts without Docker and FFmpeg. The runner and manifest are committed so a future agent can rerun the same baseline without mixing in private media.",
-                "",
-            ]
-        )
+    report_lines = [
+        "# Public Baseline Report",
+        "",
+        f"- Run id: `{manifest['run_id']}`",
+        f"- Status: {status}",
+    ]
+    if blocked_by:
+        report_lines.append(f"- Blocked by: `{blocked_by}`")
+    if missing_tools:
+        report_lines.append(f"- Missing tools: `{', '.join(missing_tools)}`")
+    report_lines.append(
+        "- Command surface: `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json`"
     )
+    if notes:
+        report_lines.append("- Notes:")
+        for note in notes:
+            report_lines.append(f"  - {note}")
+    if details:
+        report_lines.append("- Details:")
+        for key, value in details.items():
+            report_lines.append(f"  - `{key}`: `{json.dumps(value, sort_keys=True)}`")
+    report_lines.append("")
+    markdown_path.write_text("\n".join(report_lines) + "\n")
     return report_path
 
 
 def run_baseline(manifest: dict[str, Any]) -> int:
-    artifact_paths = {name: resolve_repo_path(path) for name, path in manifest["artifacts"].items()}
+    paths = manifest["paths"]
+    artifact_paths = {
+        "vectors_dir": REPO_ROOT / paths["vectors_dir"],
+        "renders_dir": REPO_ROOT / paths["renders_dir"],
+        "comparison_dir": REPO_ROOT / paths["comparison_dir"],
+        "report_dir": REPO_ROOT / "reports" / "out" / manifest["run_id"],
+    }
     for path in artifact_paths.values():
         path.mkdir(parents=True, exist_ok=True)
 
-    missing_tools = [tool for tool in ("ffmpeg", "ffprobe") if shutil.which(tool) is None]
-    if missing_tools:
-        write_failure_report(manifest, missing_tools, artifact_paths["report_dir"])
+    try:
+        ffmpeg_bin, ffprobe_bin = resolve_binary_paths(manifest)
+    except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+        write_status_report(
+            manifest,
+            artifact_paths["report_dir"],
+            status="blocked",
+            blocked_by="ffmpeg-bootstrap-failed",
+            notes=[str(exc)],
+        )
         return 2
 
     per_input_summary: dict[str, dict[str, Any]] = {}
     command_log: list[dict[str, Any]] = []
 
     for input_spec in manifest["inputs"]:
-        media_path = resolve_repo_path(input_spec["relative_output_path"])
-        ensure_parent(media_path)
-        generation_command = build_generation_command(input_spec)
-        run_command(generation_command)
-        command_log.append({"step": "generate", "input": input_spec["name"], "command": generation_command})
-
         ffprobe_output_path = artifact_paths["vectors_dir"] / f"{input_spec['name']}.ffprobe.json"
-        ffprobe_command = build_ffprobe_command(input_spec, ffprobe_output_path)
+        ffprobe_command = build_ffprobe_command(ffprobe_bin, input_spec)
         ffprobe_result = run_command(ffprobe_command, capture=True)
         ffprobe_output_path.write_text(ffprobe_result.stdout)
         command_log.append({"step": "extract", "input": input_spec["name"], "command": ffprobe_command})
 
         summary = summarize_ffprobe_frames(json.loads(ffprobe_result.stdout))
-        summary["source_path"] = str(media_path.relative_to(REPO_ROOT))
+        summary["source_path"] = input_spec["raw_path"]
+        summary["raw_sha256"] = input_spec.get("raw_sha256")
         summary_path = artifact_paths["vectors_dir"] / f"{input_spec['name']}.summary.json"
         summary_path.write_text(json.dumps(summary, indent=2) + "\n")
         per_input_summary[input_spec["name"]] = summary
 
         render_path = artifact_paths["renders_dir"] / f"{input_spec['name']}.png"
-        render_command = build_render_command(input_spec, render_path)
+        render_command = build_render_command(ffmpeg_bin, input_spec, render_path)
         run_command(render_command)
         command_log.append({"step": "render", "input": input_spec["name"], "command": render_command})
+
+    if sum(item["total_vectors"] for item in per_input_summary.values()) == 0:
+        had_motion_side_data = any(
+            item["frames_with_motion_side_data"] > 0 for item in per_input_summary.values()
+        )
+        write_status_report(
+            manifest,
+            artifact_paths["report_dir"],
+            status="blocked",
+            blocked_by="motion-vector-payload-missing" if had_motion_side_data else "motion-vectors-not-exported",
+            notes=[
+                "ffprobe completed for both public MP4 inputs",
+                "codecview render artifacts were written",
+                (
+                    "motion-vector side-data markers are present, but the ffprobe JSON payload does not include coordinate arrays"
+                    if had_motion_side_data
+                    else "no motion-vector side-data markers were exported for either public MP4 input"
+                ),
+            ],
+            details={
+                name: {
+                    "frame_count": summary["frame_count"],
+                    "frames_with_motion_side_data": summary["frames_with_motion_side_data"],
+                    "frames_with_vectors": summary["frames_with_vectors"],
+                    "total_vectors": summary["total_vectors"],
+                }
+                for name, summary in per_input_summary.items()
+            },
+        )
+        return 3
 
     comparison_summary = build_comparison_summary(per_input_summary)
     comparison_summary["generated_at"] = utc_now()
@@ -293,12 +344,24 @@ def run_baseline(manifest: dict[str, Any]) -> int:
     comparison_svg_path = artifact_paths["comparison_dir"] / "summary.svg"
     comparison_svg_path.write_text(build_comparison_svg(comparison_summary))
 
+    status_path = write_status_report(
+        manifest,
+        artifact_paths["report_dir"],
+        status="success",
+        notes=[
+            "public baseline extraction completed from the prepared HEL-150 manifest",
+            f"ffmpeg bin: {ffmpeg_bin}",
+            f"ffprobe bin: {ffprobe_bin}",
+        ],
+    )
+
     report_lines = [
-        "# Public Known-Good Baseline Report",
+        "# Public Baseline Report",
         "",
         f"- Run id: `{manifest['run_id']}`",
         "- Status: success",
-        "- Proven path: generated public fixtures -> ffprobe motion vectors -> codecview renders -> SVG comparison summary",
+        "- Proven path: prepared public MP4 manifest -> ffprobe motion vectors -> codecview renders -> SVG comparison summary",
+        f"- Input manifest: `{Path(paths['manifest_path']).name}`",
         "- Inputs:",
     ]
     for item in comparison_summary["inputs"]:
@@ -311,6 +374,7 @@ def run_baseline(manifest: dict[str, Any]) -> int:
             f"- Higher vector-count input: `{comparison_summary['higher_vector_count_input']}`",
             f"- Comparison JSON: `{comparison_json_path.relative_to(REPO_ROOT)}`",
             f"- Comparison SVG: `{comparison_svg_path.relative_to(REPO_ROOT)}`",
+            f"- Status JSON: `{status_path.relative_to(REPO_ROOT)}`",
             "",
         ]
     )
@@ -322,11 +386,21 @@ def run_baseline(manifest: dict[str, Any]) -> int:
 def print_plan(manifest: dict[str, Any]) -> int:
     plan = {
         "run_id": manifest["run_id"],
-        "wrapper_command": "scripts/run_in_docker.sh run -- python3 scripts/public_baseline.py run --manifest manifests/public_known_good_baseline.json",
-        "input_generation": {
-            input_spec["name"]: build_generation_command(input_spec) for input_spec in manifest["inputs"]
+        "prepare_command": "scripts/prepare_public_inputs.sh",
+        "run_command": "python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json",
+        "inputs": [
+            {
+                "name": input_spec["name"],
+                "raw_path": input_spec["raw_path"],
+                "source_url": input_spec["source_url"],
+            }
+            for input_spec in manifest["inputs"]
+        ],
+        "artifacts": {
+            "vectors_dir": manifest["paths"]["vectors_dir"],
+            "renders_dir": manifest["paths"]["renders_dir"],
+            "comparison_dir": manifest["paths"]["comparison_dir"],
         },
-        "artifacts": manifest["artifacts"],
     }
     json.dump(plan, sys.stdout, indent=2)
     sys.stdout.write("\n")

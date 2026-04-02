@@ -16,7 +16,8 @@ class PublicBaselineTests(unittest.TestCase):
                     {
                         "run_id": "bad",
                         "inputs": [{"name": "only-one"}],
-                        "artifacts": {"report_dir": "reports/out/example"},
+                        "paths": {"vectors_dir": "reports/out/example/vectors"},
+                        "tooling": {"ffprobe_bin": "/tmp/ffprobe"},
                     }
                 )
             )
@@ -48,6 +49,7 @@ class PublicBaselineTests(unittest.TestCase):
 
         self.assertEqual(summary["frame_count"], 2)
         self.assertEqual(summary["frames_with_vectors"], 1)
+        self.assertEqual(summary["frames_with_motion_side_data"], 1)
         self.assertEqual(summary["total_vectors"], 2)
         self.assertAlmostEqual(summary["mean_vector_magnitude"], 4.0)
         self.assertEqual(summary["frames"][0]["vector_count"], 0)
@@ -58,12 +60,14 @@ class PublicBaselineTests(unittest.TestCase):
             "input-a": {
                 "frame_count": 4,
                 "frames_with_vectors": 3,
+                "frames_with_motion_side_data": 3,
                 "total_vectors": 40,
                 "mean_vector_magnitude": 2.5,
             },
             "input-b": {
                 "frame_count": 4,
                 "frames_with_vectors": 2,
+                "frames_with_motion_side_data": 2,
                 "total_vectors": 10,
                 "mean_vector_magnitude": 1.25,
             },
@@ -77,58 +81,66 @@ class PublicBaselineTests(unittest.TestCase):
         self.assertIn("input-a", svg)
         self.assertIn("vectors: 40", svg)
 
-    def test_run_baseline_writes_blocked_report_without_ffmpeg(self) -> None:
+    def test_run_baseline_writes_blocked_report_when_bootstrap_fails(self) -> None:
         manifest = {
-            "run_id": "public-known-good-baseline",
+            "run_id": "public-baseline",
             "inputs": [
                 {
                     "name": "input-a",
-                    "relative_output_path": "datasets/fixtures/input-a.mp4",
-                    "generator": {
-                        "video_filter": "testsrc=duration=1:size=16x16:rate=1",
-                        "frame_rate": 1,
-                        "codec": "libx264",
-                        "pixel_format": "yuv420p",
-                        "gop_size": 1,
-                        "bf": 0,
-                    },
+                    "raw_path": "/tmp/input-a.mp4",
+                    "source_url": "https://example.com/a.mp4",
                 },
                 {
                     "name": "input-b",
-                    "relative_output_path": "datasets/fixtures/input-b.mp4",
-                    "generator": {
-                        "video_filter": "testsrc=duration=1:size=16x16:rate=1",
-                        "frame_rate": 1,
-                        "codec": "libx264",
-                        "pixel_format": "yuv420p",
-                        "gop_size": 1,
-                        "bf": 0,
-                    },
+                    "raw_path": "/tmp/input-b.mp4",
+                    "source_url": "https://example.com/b.mp4",
                 },
             ],
-            "artifacts": {
-                "report_dir": "reports/out/public-known-good-baseline",
-                "vectors_dir": "reports/out/public-known-good-baseline/vectors",
-                "renders_dir": "reports/out/public-known-good-baseline/renders",
-                "comparison_dir": "reports/out/public-known-good-baseline/comparison",
+            "paths": {
+                "manifest_path": "manifests/public-baseline.json",
+                "vectors_dir": "reports/out/public-baseline/vectors",
+                "renders_dir": "reports/out/public-baseline/renders",
+                "comparison_dir": "reports/out/public-baseline/comparison",
             },
+            "tooling": {"ffprobe_bin": "/tmp/ffprobe"},
         }
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir)
-            (repo_root / "datasets" / "fixtures").mkdir(parents=True)
             with mock.patch.object(public_baseline, "REPO_ROOT", repo_root):
-                with mock.patch("scripts.public_baseline.shutil.which", return_value=None):
+                with mock.patch("scripts.public_baseline.run_command", side_effect=FileNotFoundError("missing ffmpeg")):
                     exit_code = public_baseline.run_baseline(manifest)
 
             self.assertEqual(exit_code, 2)
-            status_path = repo_root / "reports" / "out" / "public-known-good-baseline" / "status.json"
-            report_path = repo_root / "reports" / "out" / "public-known-good-baseline" / "report.md"
+            status_path = repo_root / "reports" / "out" / "public-baseline" / "status.json"
+            report_path = repo_root / "reports" / "out" / "public-baseline" / "report.md"
             self.assertTrue(status_path.exists())
-            self.assertTrue(report_path.exists())
             status = json.loads(status_path.read_text())
             self.assertEqual(status["status"], "blocked")
-            self.assertIn("ffmpeg", status["missing_tools"])
+            self.assertEqual(status["blocked_by"], "ffmpeg-bootstrap-failed")
+            self.assertTrue(report_path.exists())
+
+    def test_print_plan_uses_prepared_manifest_inputs(self) -> None:
+        manifest = {
+            "run_id": "public-baseline",
+            "inputs": [
+                {"name": "a", "raw_path": "/tmp/a.mp4", "source_url": "https://example.com/a.mp4"},
+                {"name": "b", "raw_path": "/tmp/b.mp4", "source_url": "https://example.com/b.mp4"},
+            ],
+            "paths": {
+                "vectors_dir": "reports/out/public-baseline/vectors",
+                "renders_dir": "reports/out/public-baseline/renders",
+                "comparison_dir": "reports/out/public-baseline/comparison",
+            },
+            "tooling": {"ffprobe_bin": "/tmp/ffprobe"},
+        }
+
+        with mock.patch("sys.stdout.write") as mock_write:
+            public_baseline.print_plan(manifest)
+
+        written = "".join(call.args[0] for call in mock_write.call_args_list)
+        self.assertIn("scripts/prepare_public_inputs.sh", written)
+        self.assertIn("/tmp/a.mp4", written)
 
 
 if __name__ == "__main__":

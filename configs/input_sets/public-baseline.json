@@ -1,0 +1,31 @@
+{
+  "run_id": "public-baseline",
+  "manifest_version": 1,
+  "comparison_label": "big-buck-bunny-480p-vs-1080p",
+  "visibility": "public",
+  "source_page_url": "https://github.com/chthomos/video-media-samples",
+  "license_url": "https://raw.githubusercontent.com/chthomos/video-media-samples/master/LICENSE.md",
+  "license_notes": "Repository is MIT-licensed; bundled Big Buck Bunny source footage is CC BY 3.0 per upstream LICENSE.md.",
+  "notes": [
+    "Both files are H.264/AAC MP4 samples from the same public repository.",
+    "The pair keeps content constant while varying encode characteristics, which is useful for the first extraction/comparison baseline."
+  ],
+  "inputs": [
+    {
+      "name": "bbb_480p_30s",
+      "filename": "big-buck-bunny-480p-30sec.mp4",
+      "source_url": "https://raw.githubusercontent.com/chthomos/video-media-samples/master/big-buck-bunny-480p-30sec.mp4",
+      "visibility": "public",
+      "provenance": "chthomos/video-media-samples",
+      "notes": "30 second Big Buck Bunny clip at 480p."
+    },
+    {
+      "name": "bbb_1080p_30s",
+      "filename": "big-buck-bunny-1080p-30sec.mp4",
+      "source_url": "https://raw.githubusercontent.com/chthomos/video-media-samples/master/big-buck-bunny-1080p-30sec.mp4",
+      "visibility": "public",
+      "provenance": "chthomos/video-media-samples",
+      "notes": "30 second Big Buck Bunny clip at 1080p."
+    }
+  ]
+}

@@ -17,6 +17,6 @@ Symphony-managed project: MP4 Motion Vector Visualization
 
 ## Public baseline entry point
 
-- `manifests/public_known_good_baseline.json`: deterministic two-input public baseline manifest
-- `python3 scripts/public_baseline.py plan --manifest manifests/public_known_good_baseline.json`: print the exact baseline plan and generation commands
-- `scripts/run_in_docker.sh run -- python3 scripts/public_baseline.py run --manifest manifests/public_known_good_baseline.json`: execute the known-good baseline inside the documented Docker contract
+- `scripts/prepare_public_inputs.sh`: fetch the committed public MP4 pair and write `manifests/public-baseline.json`
+- `python3 scripts/public_baseline.py plan --manifest manifests/public-baseline.json`: print the exact extraction/render plan for the prepared public baseline
+- `python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json`: execute the public baseline against the prepared input manifest
