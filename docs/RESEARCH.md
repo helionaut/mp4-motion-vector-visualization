@@ -9,7 +9,7 @@ Build a research workflow to ingest two MP4 files, extract codec motion vectors,
 ## Current answer state
 
 - Overall verdict: `public-baseline-failure-reproduced`
-- Highest-value unanswered question: which extractor surface or FFmpeg invocation change is required when `ffprobe` exposes motion-vector side-data markers but omits the coordinate payload for the agreed public MP4 pair?
+- Highest-value unanswered question: whether the FFmpeg decode path using `-export_side_data mvs` can expose coordinate-bearing motion-vector payloads when the current `ffprobe -flags2 +export_mvs` JSON path still emits only empty side-data markers for the agreed public MP4 pair
 
 ## Reusable baseline
 
@@ -97,11 +97,11 @@ This project should not branch into UI polish or speculative parser work until t
 
 ### Exact next issue
 
-- Recommended next issue title: `Public extractor recovery: switch from ffprobe JSON export_mvs to an alternate FFmpeg motion-vector surface`
+- Recommended next issue title: `Public extractor recovery: switch from ffprobe JSON export_mvs to FFmpeg -export_side_data mvs on the prepared public baseline`
 - Strategic context:
   - the project is blocked on extraction viability, not on environment bootstrap, input preparation, or UI work
 - Tactical next step:
-  - rerun the public Big Buck Bunny baseline while changing only the extractor surface used to obtain machine-readable vectors
+  - rerun the public Big Buck Bunny baseline while changing only the extractor surface from the current `ffprobe -flags2 +export_mvs -show_frames -of json` path to an FFmpeg decode-path attempt using `-export_side_data mvs`
 - Reuse from previous work:
   - `manifests/public-baseline.json`
   - `scripts/prepare_public_inputs.sh`
@@ -110,17 +110,17 @@ This project should not branch into UI polish or speculative parser work until t
   - `reports/out/public-baseline/report.md`
   - `/home/helionaut/srv/research-cache/18afd661ce11`
 - Changed variable:
-  - extractor surface, specifically moving away from the current `ffprobe -flags2 +export_mvs -show_frames -print_format json` path if it still omits coordinates
+  - extractor surface only, specifically moving away from the current `ffprobe -flags2 +export_mvs -show_frames -print_format json` path to the FFmpeg decode surface that exports `mvs` side data
 - Hypothesis:
-  - an alternate FFmpeg-backed extraction surface will expose per-frame vector coordinates for the same public MP4 pair without changing inputs or environment
+  - the FFmpeg decode path with `-export_side_data mvs` can expose per-frame vector coordinates for the same public MP4 pair without changing inputs, Docker contract, or cache layout
 - Success criterion:
-  - the public baseline writes non-empty vector JSON for both inputs, with at least one frame containing coordinate-bearing vectors that can feed the comparison stage
+  - the rerun publishes one deterministic command, a machine-readable runtime progress artifact with real counters, and either non-empty vector artifacts for at least one public input plus refreshed render/comparison evidence or a tighter truthful failure boundary tied to the FFmpeg `-export_side_data mvs` surface
 - Abort condition:
-  - if two materially different FFmpeg-backed extraction surfaces still produce side-data markers without coordinates for the same public pair, stop and record that FFmpeg-side extraction is insufficient for this footage on this stack
+  - if the `-export_side_data mvs` attempt still yields zero vectors or unsupported output for the same public pair, stop and record that exact boundary without reopening private/user-data validation
 - Outputs:
   - updated extractor command or script
   - updated `reports/out/public-baseline/` evidence
-  - updated `docs/RESEARCH.md` naming whether FFmpeg remains viable or the project must escalate to a different parser/tool family
+  - a focused handoff that says what shipped in this slice, what remains blocked in the original request, and whether Docker-capable infrastructure is still required for a live container proof
 
 ## Experiment ledger rules
 
