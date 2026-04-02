@@ -14,3 +14,9 @@ Symphony-managed project: MP4 Motion Vector Visualization
 - `scripts/run_in_docker.sh doctor`: print the selected Docker/cache contract
 - `scripts/run_in_docker.sh dry-run`: print the exact `docker build` and `docker run` commands the baseline uses
 - `scripts/run_in_docker.sh ffmpeg-version`: prove the containerized FFmpeg baseline on a Docker-capable machine
+
+## Public baseline entry point
+
+- `scripts/prepare_public_inputs.sh`: fetch the committed public MP4 pair and write `manifests/public-baseline.json`
+- `python3 scripts/public_baseline.py plan --manifest manifests/public-baseline.json`: print the exact extraction/render plan for the prepared public baseline
+- `python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json`: execute the public baseline against the prepared input manifest

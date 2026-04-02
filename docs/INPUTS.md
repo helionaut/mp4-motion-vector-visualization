@@ -24,10 +24,6 @@ Rules:
 
 The workflow expects two MP4 source inputs for every comparison run.
 
-### Public baseline pair
-
-The baseline lane now has an exact shareable source-of-truth pair:
-
 | Input | Retrieval URL | Provenance | Notes |
 | --- | --- | --- | --- |
 | `bbb_480p_30s` | `https://raw.githubusercontent.com/chthomos/video-media-samples/master/big-buck-bunny-480p-30sec.mp4` | `chthomos/video-media-samples` | Big Buck Bunny 30 second H.264/AAC MP4 sample at 480p |
@@ -42,6 +38,11 @@ Why this pair:
 - both files are public and directly retrievable without auth
 - both files are MP4/H.264/AAC and small enough for repeated baseline runs
 - they keep content constant while changing encode characteristics, which is useful for the first comparison lane
+
+Current status:
+- Public MP4 pair: fixed by `configs/input_sets/public-baseline.json` and normalized into `manifests/public-baseline.json`
+- HEL-151 baseline runner: `python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json`
+- Private/user MP4 pair: not provided in this intake; only a blocker if HEL-152 begins and no private inputs exist then
 
 ### Private/user validation pair
 
@@ -135,8 +136,6 @@ shared research cache root.
 
 ## Bootstrap And Acquisition
 
-### One-command baseline preparation
-
 Run this from the repo root:
 
 ```bash
@@ -150,17 +149,18 @@ What it does:
 4. writes full ffprobe JSON sidecars into `/home/helionaut/srv/research-cache/18afd661ce11/datasets/public/prepared/public-baseline/probe/`
 5. writes the normalized manifest to `manifests/public-baseline.json`
 
-### Manual component commands
-
-If a later lane needs to customize paths:
+After that, HEL-151 should run:
 
 ```bash
-scripts/bootstrap_media_tools.sh
-python3 scripts/prepare_inputs.py \
-  --config configs/input_sets/public-baseline.json \
-  --manifest-out manifests/public-baseline.json \
-  --ffprobe-bin "$(scripts/bootstrap_media_tools.sh)"
+python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json
 ```
+
+That command should:
+1. reuse the prepared public manifest instead of rediscovering inputs
+2. export motion-vector side data with `ffprobe -flags2 +export_mvs`
+3. render one codecview overlay per input
+4. write a JSON comparison summary plus compact report under `reports/out/public-baseline/`
+5. leave private/user data untouched
 
 ## Real Gaps
 

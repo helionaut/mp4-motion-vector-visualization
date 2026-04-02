@@ -138,6 +138,23 @@ What still requires infrastructure:
 - one Docker-capable host needs to run `scripts/run_in_docker.sh ffmpeg-version` and `scripts/run_in_docker.sh run ffprobe -version`
 - once that succeeds, write the validation artifact and reuse the same wrapper for later experiment issues
 
+## Extractor follow-up reuse contract
+
+The next public extractor recovery slice must keep this environment contract fixed while changing only the extraction surface.
+
+- Reuse the same Docker wrapper and cache root:
+  - `scripts/run_in_docker.sh`
+  - `/home/helionaut/srv/research-cache/18afd661ce11`
+- Reuse prepared public inputs and manifest outputs instead of rebuilding them:
+  - `scripts/prepare_public_inputs.sh`
+  - `manifests/public-baseline.json`
+  - shared-cache prepared inputs under `/home/helionaut/srv/research-cache/18afd661ce11/datasets/public/`
+- Validation for that slice must stay explicit:
+  - rerun the prepared public baseline with one deterministic command surface
+  - emit a machine-readable runtime progress artifact with counters/metrics
+  - either publish non-empty vector artifacts plus refreshed render/comparison evidence or record the exact failure boundary for the alternate extractor surface
+- If Docker is still unavailable on the executing machine, the handoff must say that the code/docs slice shipped but live container validation remains blocked by missing Docker-capable infrastructure
+
 ## Reuse rules
 
 - Never leave the only copy of a useful baseline inside a disposable issue workspace.
