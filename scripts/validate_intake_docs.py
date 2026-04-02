@@ -28,8 +28,8 @@ REQUIRED_FILES = {
     "docs/ENVIRONMENT.md": [
         "# Environment Contract",
         "Default execution strategy: `docker`",
-        "## Current contract",
-        "## First environment target",
+        "## Chosen strategy",
+        "## Shared cache contract",
     ],
     "docs/INPUTS.md": [
         "# External Inputs Contract: MP4 Motion Vector Visualization",
