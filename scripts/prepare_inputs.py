@@ -12,7 +12,6 @@ import subprocess
 import sys
 import urllib.request
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -113,7 +112,6 @@ def make_manifest(
     layout: Layout,
     ffprobe_bin: str,
     manifest_path: Path,
-    generated_at: str,
 ) -> dict[str, Any]:
     prepared_probe_dir = layout.public_prepared_dir / "probe"
     prepared_probe_dir.mkdir(parents=True, exist_ok=True)
@@ -147,7 +145,6 @@ def make_manifest(
         "manifest_version": config["manifest_version"],
         "run_id": config["run_id"],
         "comparison_label": config["comparison_label"],
-        "generated_at": generated_at,
         "visibility": config["visibility"],
         "tooling": {
             "ffprobe_bin": ffprobe_bin,
@@ -207,13 +204,11 @@ def main() -> int:
     layout.public_prepared_dir.mkdir(parents=True, exist_ok=True)
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
 
-    generated_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     manifest = make_manifest(
         config=config,
         layout=layout,
         ffprobe_bin=args.ffprobe_bin,
         manifest_path=manifest_path,
-        generated_at=generated_at,
     )
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     json.dump(manifest, sys.stdout, indent=2, sort_keys=True)

@@ -99,7 +99,6 @@ class PrepareInputsTests(unittest.TestCase):
                     layout=layout,
                     ffprobe_bin="/tmp/ffprobe",
                     manifest_path=manifest_path,
-                    generated_at="2026-04-02T18:00:00Z",
                 )
             finally:
                 prepare_inputs.probe_file = original_probe
