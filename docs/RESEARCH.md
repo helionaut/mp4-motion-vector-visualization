@@ -8,8 +8,8 @@ Build a research workflow to ingest two MP4 files, extract codec motion vectors,
 
 ## Current answer state
 
-- Overall verdict: `public-baseline-failure-reproduced`
-- Highest-value unanswered question: whether the FFmpeg decode path using `-export_side_data mvs` can expose coordinate-bearing motion-vector payloads when the current `ffprobe -flags2 +export_mvs` JSON path still emits only empty side-data markers for the agreed public MP4 pair
+- Overall verdict: `ffmpeg-decode-path-boundary-recorded`
+- Highest-value unanswered question: whether a libavcodec-backed extractor can serialize coordinate-bearing motion vectors now that the FFmpeg CLI decode path proves motion-vector side-data bytes exist on the agreed public MP4 pair
 
 ## Reusable baseline
 
@@ -121,6 +121,52 @@ This project should not branch into UI polish or speculative parser work until t
   - updated extractor command or script
   - updated `reports/out/public-baseline/` evidence
   - a focused handoff that says what shipped in this slice, what remains blocked in the original request, and whether Docker-capable infrastructure is still required for a live container proof
+
+## HEL-155 outcome
+
+### What is proven
+
+- The prepared public Big Buck Bunny pair still reproduces cleanly under the existing manifest, cache layout, and codecview render path.
+- `ffmpeg -export_side_data +mvs -i <input> -vf showinfo -f null -` surfaces motion-vector side-data bytes on the public baseline even though the earlier `ffprobe -flags2 +export_mvs -show_frames -of json` path only exposed empty vector arrays.
+- The decode-path rerun wrote a machine-readable runtime progress artifact at `.symphony/progress/HEL-155.json` and refreshed the public-baseline evidence under `reports/out/public-baseline/`.
+- The new tighter boundary is specific and measured:
+  - `bbb_480p_30s`: 714/720 frames with motion-vector side data, `66,011,680` total payload bytes
+  - `bbb_1080p_30s`: 714/720 frames with motion-vector side data, `337,375,720` total payload bytes
+  - both inputs still report `frames_with_vectors=0` and `total_vectors=0` because the FFmpeg CLI decode path does not serialize coordinate-bearing vectors
+
+### What is blocked
+
+- The public baseline now proves the decoder can surface motion-vector side-data payloads, but the committed CLI path still cannot turn those payload bytes into machine-readable coordinates.
+- This means the original project ask is still not fully proven: the workflow can render codecview overlays and count payload bytes, but it still cannot publish coordinate-bearing motion-vector artifacts for comparison.
+- Live Docker validation is still blocked on this machine because `docker` is unavailable, so the repo carries the command surface but not a locally executed container proof.
+
+### Exact next issue
+
+- Recommended next issue title: `Public extractor recovery: serialize FFmpeg motion-vector side data into coordinates on the prepared public baseline`
+- Strategic context:
+  - HEL-155 narrowed the blocker from "maybe no motion vectors are exported" to "motion-vector side-data bytes exist, but the current CLI surface does not serialize coordinates"
+- Tactical next step:
+  - keep the prepared public pair, Docker contract, and render/comparison paths fixed while replacing only the coordinate-serialization surface, for example with FFmpeg's `extract_mvs` example or a small libavcodec-backed helper
+- Reuse from previous work:
+  - `manifests/public-baseline.json`
+  - `scripts/public_baseline.py`
+  - `reports/out/public-baseline/status.json`
+  - `reports/out/public-baseline/comparison/summary.json`
+  - `reports/out/public-baseline/vectors/*.ffmpeg-showinfo.log`
+  - `.symphony/progress/HEL-155.json`
+  - `/home/helionaut/srv/research-cache/18afd661ce11`
+- Changed variable:
+  - coordinate-serialization surface only
+- Hypothesis:
+  - a libavcodec-backed extractor can reuse the now-proven FFmpeg motion-vector side-data payloads and emit non-empty coordinate-bearing vectors for the same public pair
+- Success criterion:
+  - the public baseline rerun writes non-empty machine-readable coordinate vectors for at least one input while keeping the manifest shape, prepared inputs, Docker contract, and output locations stable
+- Abort condition:
+  - if a library-level extractor still cannot serialize coordinate-bearing vectors from the same FFmpeg side-data payloads, stop and record that the project is blocked beyond the current FFmpeg extractor family
+- Outputs:
+  - one deterministic coordinate-serialization command or helper
+  - refreshed public-baseline vector/comparison evidence
+  - an updated handoff that says whether the project can finally reopen the private-data lane
 
 ## Experiment ledger rules
 
