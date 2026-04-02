@@ -1,0 +1,19 @@
+{
+  "issue": "HEL-148",
+  "goal": "Author docs/PRD.md as the experiment contract and add a baseline remote validation check for that contract.",
+  "definition_of_done": "docs/PRD.md remains aligned to project intent, a repo-level PRD contract check exists, local validation is green, and PR #1 shows a real remote check.",
+  "current_phase": "rework",
+  "most_important_next_action": "Add the smallest GitHub-side validation check for docs/PRD.md so PR #1 has a real remote status signal.",
+  "request_summary": "Keep the PRD contract intact and make the published PR reviewable with a real remote check.",
+  "delivery_summary": "This rework pass adds a minimal PRD contract validation path for local and GitHub execution.",
+  "main_difficulty": "The repo currently has no configured GitHub checks, so the docs-only PR cannot satisfy the review gate.",
+  "next_step_summary": "Commit the PRD validation script and GitHub Actions workflow, then rerun validation and push PR #1.",
+  "publish_required": true,
+  "last_green_validation_sha": "bc0e43f038db6e460f830409536e12d108dc78dd",
+  "last_green_validation_at": "2026-04-02T17:34:37.322929+00:00",
+  "pr_url": "https://github.com/helionaut/mp4-motion-vector-visualization/pull/1",
+  "blocked_by": [
+    "missing-remote-checks"
+  ],
+  "updated_at": "2026-04-02T17:54:00.565181+00:00"
+}
