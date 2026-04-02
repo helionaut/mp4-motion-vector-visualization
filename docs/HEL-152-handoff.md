@@ -9,7 +9,7 @@ HEL-152 is the private-data validation lane. It only makes sense after HEL-151 l
 
 ## Tactical result from this pass
 
-This pass made HEL-152 self-contained for the published baseline surface: the branch now carries the HEL-151 public runner, reproduces the same local `motion-vector-payload-missing` failure boundary without Docker, and exposes a one-command private validation wrapper. The remaining missing fact is the actual user MP4 pair.
+This pass made HEL-152 self-contained for the published baseline surface: the branch now carries the HEL-151 public runner, reproduces the same local `motion-vector-payload-missing` failure boundary without Docker, and exposes a one-command private validation wrapper that now fails early with a machine-readable `missing-user-inputs` blocker when the real user MP4 pair has not been staged yet.
 
 ## What was checked
 
@@ -29,7 +29,7 @@ This pass made HEL-152 self-contained for the published baseline surface: the br
 6. `scripts/bootstrap_media_tools.sh` now proves this host can bootstrap runnable static `ffprobe` and `ffmpeg` binaries under the shared toolchain cache even though no system binaries are on `PATH`.
 7. HEL-152 now carries `scripts/public_baseline.py`, `scripts/validate_public_baseline.py`, the committed public blocked-run report, and the focused tests needed to execute the published baseline surface from this branch.
 8. Running `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json` on this host reproduces the same expected blocked boundary with exit `3` and refreshed render/report artifacts, so Docker is no longer required to prove that public baseline surface locally.
-9. HEL-152 now has a committed private staging and rerun path via `configs/input_sets/private-template.json`, `scripts/prepare_private_inputs.sh`, and `scripts/run_private_validation.sh`, so the next pass does not need to assemble the private lane manually once the user MP4 pair arrives.
+9. HEL-152 now has a committed private staging and rerun path via `configs/input_sets/private-template.json`, `scripts/prepare_private_inputs.sh`, `scripts/run_private_validation.sh`, and `scripts/validate_private_input_config.py`, so the next pass does not need to assemble the private lane manually once the user MP4 pair arrives.
 10. A truthful public success baseline still does not exist, and there is still no `datasets/user/` tree for HEL-152 to run against.
 
 ## Experiment contract for the next pass
