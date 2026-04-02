@@ -9,7 +9,7 @@ HEL-152 is the private-data validation lane. It only makes sense after HEL-151 l
 
 ## Tactical result from this pass
 
-This pass confirmed that HEL-151 now publishes a reusable public failure boundary, but a truthful public success proof still does not exist and the current machine still cannot run the lane locally.
+This pass confirmed that HEL-151 now publishes a reusable public failure boundary and added a repo-local private manifest staging path, but a truthful public success proof still does not exist and the current machine still cannot run the lane locally.
 
 ## What was checked
 
@@ -26,8 +26,9 @@ This pass confirmed that HEL-151 now publishes a reusable public failure boundar
 3. PR #5 now publishes a stronger reusable public failure boundary instead of the older missing-runtime-only report.
 4. Its committed `reports/out/public-baseline/status.json` records `motion-vector-payload-missing` with the exact command surface `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json`.
 5. The committed report says both public inputs produced render artifacts and `ffprobe` side-data markers on 714 frames each, but zero exported motion-vector payload coordinates.
-6. A truthful public success baseline still does not exist, and there is still no `datasets/user/` tree for HEL-152 to run against.
-7. The current machine still has no `docker`, `ffmpeg`, or `ffprobe` binary on the host path, so it cannot independently confirm or extend the published HEL-151 failure boundary locally.
+6. HEL-152 now has a committed private staging path via `configs/input_sets/private-template.json` plus `python3 scripts/prepare_inputs.py --config ... --manifest-out manifests/user-validation.json --ffprobe-bin <path>`, so the repo no longer needs a new adapter before the user MP4 pair arrives.
+7. A truthful public success baseline still does not exist, and there is still no `datasets/user/` tree for HEL-152 to run against.
+8. The current machine still has no `docker`, `ffmpeg`, or `ffprobe` binary on the host path, so it cannot independently confirm or extend the published HEL-151 failure boundary locally.
 
 ## Experiment contract for the next pass
 
@@ -40,7 +41,7 @@ This pass confirmed that HEL-151 now publishes a reusable public failure boundar
 
 - environment wrapper: `scripts/run_in_docker.sh`
 - environment contract: `docs/ENVIRONMENT.md`
-- public input contract and manifest shape: `docs/INPUTS.md`, `scripts/prepare_inputs.py`, `manifests/public-baseline.json`
+- public and private input contract: `docs/INPUTS.md`, `scripts/prepare_inputs.py`, `configs/input_sets/private-template.json`, `manifests/public-baseline.json`
 - shared cache root: `/home/helionaut/srv/research-cache/18afd661ce11`
 - HEL-151 draft PR #5 at `34cd50a32f7c7e0c3a6c20f5d7dc864a11d50a53`
 - committed public failure artifacts in `reports/out/public-baseline/`
@@ -48,4 +49,4 @@ This pass confirmed that HEL-151 now publishes a reusable public failure boundar
 
 ## Next recommended slice
 
-Provision runnable infrastructure plus the actual user MP4 pair for HEL-152, then reuse HEL-151's published public command surface unchanged to determine whether private inputs also hit `motion-vector-payload-missing` or expose a different blocker.
+Provision runnable infrastructure plus the actual user MP4 pair for HEL-152, stage the files with the committed private manifest template, and then reuse HEL-151's published public command surface unchanged to determine whether private inputs also hit `motion-vector-payload-missing` or expose a different blocker.

@@ -56,6 +56,26 @@ cache under:
 The private lane should reuse the same manifest shape created here, replacing
 public `source_url` fields with secure provenance notes.
 
+Repo-local private manifest template:
+
+- template config: `configs/input_sets/private-template.json`
+
+When the user MP4 pair becomes available, stage the manifest with:
+
+```bash
+python3 scripts/prepare_inputs.py \
+  --config configs/input_sets/private-template.json \
+  --manifest-out manifests/user-validation.json \
+  --ffprobe-bin /absolute/path/to/ffprobe
+```
+
+What this private flow does:
+
+1. reads `local_path` entries instead of public `source_url` downloads
+2. copies the staged user MP4 files into `/home/helionaut/srv/research-cache/18afd661ce11/datasets/user/raw/<run-id>/`
+3. writes ffprobe sidecars into `/home/helionaut/srv/research-cache/18afd661ce11/datasets/user/prepared/<run-id>/probe/`
+4. emits a manifest with the same downstream shape as the public lane, but with `source_url: null`
+
 ## Prepared Artifacts
 
 The downstream workflow should consume these prepared artifacts:
@@ -85,6 +105,7 @@ The downstream workflow should consume these prepared artifacts:
 
 Repo-local control files:
 - input catalog: `configs/input_sets/public-baseline.json`
+- private input template: `configs/input_sets/private-template.json`
 - manifest generator: `scripts/prepare_inputs.py`
 - public baseline wrapper: `scripts/prepare_public_inputs.sh`
 - media-tools bootstrap: `scripts/bootstrap_media_tools.sh`

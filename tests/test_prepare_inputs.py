@@ -110,6 +110,76 @@ class PrepareInputsTests(unittest.TestCase):
             self.assertEqual(manifest["private_input_contract"]["expected_raw_dir"], str(layout.private_raw_dir))
             self.assertEqual(json.loads(probe_path.read_text(encoding="utf-8"))["format"]["format_name"], "mp4")
 
+    def test_make_manifest_stages_private_local_inputs_without_source_urls(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            datasets_root = tmp_path / "datasets"
+            source_dir = tmp_path / "incoming"
+            source_dir.mkdir(parents=True)
+
+            source_file = source_dir / "private-clip.mp4"
+            source_file.write_bytes(b"private-mp4")
+
+            config = {
+                "manifest_version": 1,
+                "run_id": "user-validation",
+                "comparison_label": "private-test",
+                "visibility": "private",
+                "source_page_url": None,
+                "license_url": None,
+                "license_notes": "private-user-data",
+                "notes": ["private lane"],
+                "inputs": [
+                    {
+                        "name": "private_clip",
+                        "visibility": "private",
+                        "filename": "private-clip.mp4",
+                        "local_path": str(source_file),
+                        "provenance": "user-upload-2026-04-02",
+                        "notes": "staged private clip",
+                    }
+                ],
+            }
+            layout = Layout(
+                datasets_root=datasets_root,
+                public_raw_dir=datasets_root / "public" / "raw" / "user-validation",
+                public_prepared_dir=datasets_root / "public" / "prepared" / "user-validation",
+                private_raw_dir=datasets_root / "user" / "raw" / "user-validation",
+                private_prepared_dir=datasets_root / "user" / "prepared" / "user-validation",
+            )
+            manifest_path = tmp_path / "manifests" / "user-validation.json"
+
+            def fake_probe(_ffprobe_bin: str, _input_path: Path) -> dict[str, object]:
+                return {
+                    "format": {"format_name": "mp4", "duration": "2.0", "bit_rate": "12", "size": "11"},
+                    "streams": [{"codec_type": "video", "codec_name": "h264", "width": 32, "height": 18}],
+                }
+
+            import scripts.prepare_inputs as prepare_inputs
+
+            original_probe = prepare_inputs.probe_file
+            try:
+                prepare_inputs.probe_file = fake_probe
+                manifest = make_manifest(
+                    config=config,
+                    layout=layout,
+                    ffprobe_bin="/tmp/ffprobe",
+                    manifest_path=manifest_path,
+                )
+            finally:
+                prepare_inputs.probe_file = original_probe
+
+            staged_raw_path = layout.private_raw_dir / "private-clip.mp4"
+            staged_probe_path = layout.private_prepared_dir / "probe" / "private_clip.ffprobe.json"
+
+            self.assertTrue(staged_raw_path.is_file())
+            self.assertEqual(staged_raw_path.read_bytes(), b"private-mp4")
+            self.assertTrue(staged_probe_path.is_file())
+            self.assertEqual(manifest["inputs"][0]["raw_path"], str(staged_raw_path))
+            self.assertIsNone(manifest["inputs"][0]["source_url"])
+            self.assertEqual(manifest["visibility"], "private")
+            self.assertEqual(json.loads(staged_probe_path.read_text(encoding="utf-8"))["format"]["format_name"], "mp4")
+
 
 if __name__ == "__main__":
     unittest.main()

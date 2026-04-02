@@ -1,0 +1,31 @@
+{
+  "run_id": "user-validation",
+  "manifest_version": 1,
+  "comparison_label": "replace-with-private-comparison-label",
+  "visibility": "private",
+  "source_page_url": null,
+  "license_url": null,
+  "license_notes": "private-user-provided-data",
+  "notes": [
+    "Replace the placeholder provenance strings with secure internal notes before running HEL-152.",
+    "Each input uses local_path instead of source_url so the manifest generator stages files from a local trusted path into the shared cache."
+  ],
+  "inputs": [
+    {
+      "name": "input_a",
+      "filename": "input-a.mp4",
+      "local_path": "/absolute/path/to/user-input-a.mp4",
+      "visibility": "private",
+      "provenance": "replace-with-secure-provenance-note-a",
+      "notes": "Replace with a non-secret description of input A."
+    },
+    {
+      "name": "input_b",
+      "filename": "input-b.mp4",
+      "local_path": "/absolute/path/to/user-input-b.mp4",
+      "visibility": "private",
+      "provenance": "replace-with-secure-provenance-note-b",
+      "notes": "Replace with a non-secret description of input B."
+    }
+  ]
+}
