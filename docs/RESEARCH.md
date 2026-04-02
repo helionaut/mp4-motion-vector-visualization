@@ -13,8 +13,8 @@ Build a research workflow to ingest two MP4 files, extract codec motion vectors,
 
 ## Reusable baseline
 
-- Known-good public baseline: pending HEL-151; target is two public sample MP4s plus a deterministic extractor/render command
-- Known-good private/user-data baseline: _not established yet_
+- Known-good public baseline: not established yet; HEL-151 currently records only a minimal reproducible failure path on a machine without Docker/ffmpeg/ffprobe, and there is no published HEL-151 branch or PR carrying a reusable extractor/render proof
+- Known-good private/user-data baseline: not established yet; HEL-152 should not rerun on private data until the public baseline above becomes credible and reusable
 - Reusable build/tooling baseline: repo-local Dockerfile plus `scripts/run_in_docker.sh` with shared cache mounts; live container proof still requires a Docker-capable host
 - Shared cache root: `/home/helionaut/srv/research-cache/18afd661ce11`
 
