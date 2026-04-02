@@ -9,7 +9,7 @@ HEL-152 is the private-data validation lane. It only makes sense after the publi
 
 ## Tactical result from this pass
 
-This pass keeps HEL-152 aligned with the latest published public baseline surface: the branch now carries the HEL-155 FFmpeg decode-path runner and evidence, local and remote validation are green on PR #6 head `980c0e6`, and the one-command private validation wrapper still fails early with a machine-readable `missing-user-inputs` blocker until the real user MP4 pair is staged.
+This pass rechecked the published HEL-152 validation lane against the current workspace state: local and published branch heads both resolve to PR #6 head `3e2c7bb`, the HEL-155 FFmpeg decode-path baseline remains the committed surface this lane must reuse, and the one-command private validation wrapper is still correctly blocked by a machine-readable `missing-user-inputs` result until the real user MP4 pair is staged.
 
 ## What was checked
 
@@ -21,18 +21,16 @@ This pass keeps HEL-152 aligned with the latest published public baseline surfac
 
 ## Findings
 
-1. PR #6 (`HEL-152: self-contain baseline and private validation`) is open, draft, and clean on GitHub at head `980c0e6a5ff854dd4adf775dc2fb7598d31f737b`.
-2. The visible GitHub Actions runs for `980c0e6` are complete and successful:
-   - `Intake Docs CI`: success (`23918409672`)
-   - `Intake Docs CI`: success (`23918407347`)
-3. HEL-152 now inherits the newer HEL-155 public baseline surface from `origin/main`, not the older HEL-151 `ffprobe` boundary.
-4. The committed `reports/out/public-baseline/status.json` now records the tighter blocker `ffmpeg-export-side-data-mvs-cli-lacks-coordinate-vectors` instead of `motion-vector-payload-missing`.
+1. PR #6 (`HEL-152: self-contain baseline and private validation`) is still open and draft on GitHub at head `3e2c7bb0fba22e8de3d9f8b02b95c11bda599795`.
+2. The local workspace head and `origin/eugeniy/hel-152-user-data-validation-lane-mp4-motion-vector-visualization` both resolve to `3e2c7bb`, so there is no unpublished local divergence to repair before the next rerun.
+3. HEL-152 still inherits the HEL-155 public baseline surface from `origin/main`, not the older HEL-151 `ffprobe` boundary.
+4. The committed `reports/out/public-baseline/status.json` records the current public-lane blocker `ffmpeg-export-side-data-mvs-cli-lacks-coordinate-vectors`.
 5. That committed report proves the FFmpeg decode path surfaces motion-vector side-data bytes on 714/720 frames for both public inputs, but still serializes zero coordinate-bearing vectors.
 6. `scripts/bootstrap_media_tools.sh` still proves this host can bootstrap runnable static `ffprobe` and `ffmpeg` binaries under the shared toolchain cache even though no system binaries are on `PATH`.
 7. HEL-152 carries `scripts/public_baseline.py`, `scripts/validate_public_baseline.py`, the committed HEL-155 public blocked-run report, and the focused tests needed to execute the current published baseline surface from this branch.
-8. Aggregate local validation is green on `980c0e6`: docs/contracts passed, 13 tests passed, `scripts/validate_public_baseline.py` passed, and `scripts/run_private_validation.sh` still exits `2` with the machine-readable `missing-user-inputs` artifact.
+8. The existing aggregate local validation artifact is still green on `3e2c7bb`: docs/contracts passed, tests passed, `scripts/validate_public_baseline.py` passed, and `scripts/run_private_validation.sh` still exits `2` with the machine-readable `missing-user-inputs` artifact until real user media is staged.
 9. HEL-152 still has the committed private staging and rerun path via `configs/input_sets/private-template.json`, `scripts/prepare_private_inputs.sh`, `scripts/run_private_validation.sh`, and `scripts/validate_private_input_config.py`, so the next pass does not need to assemble the private lane manually once the user MP4 pair arrives.
-10. There is still no staged file anywhere under `/home/helionaut/srv/research-cache/18afd661ce11/datasets/user/`, so the private rerun cannot start truthfully.
+10. `find /home/helionaut/srv/research-cache/18afd661ce11/datasets/user -maxdepth 4 -type f` returns no staged private files, so the private rerun cannot start truthfully on this machine yet.
 
 ## Experiment contract for the next pass
 
@@ -48,7 +46,7 @@ This pass keeps HEL-152 aligned with the latest published public baseline surfac
 - public and private input contract: `docs/INPUTS.md`, `scripts/prepare_inputs.py`, `scripts/prepare_private_inputs.sh`, `scripts/run_private_validation.sh`, `scripts/public_baseline.py`, `scripts/validate_public_baseline.py`, `configs/input_sets/private-template.json`, `manifests/public-baseline.json`
 - shared cache root: `/home/helionaut/srv/research-cache/18afd661ce11`
 - HEL-155 landed on `origin/main` as commit `59e42f64416d7aa0a4b768f4f1885bc525f0b7c4`
-- current review branch / PR: `eugeniy/hel-152-user-data-validation-lane-mp4-motion-vector-visualization` / PR #6 at `980c0e6a5ff854dd4adf775dc2fb7598d31f737b`
+- current review branch / PR: `eugeniy/hel-152-user-data-validation-lane-mp4-motion-vector-visualization` / PR #6 at `3e2c7bb0fba22e8de3d9f8b02b95c11bda599795`
 - committed public failure artifacts in `reports/out/public-baseline/`
 - public command surface: `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-155.json`
 
