@@ -9,7 +9,7 @@ Build a research workflow to ingest two MP4 files, extract codec motion vectors,
 ## Current answer state
 
 - Overall verdict: `public-baseline-failure-reproduced`
-- Highest-value unanswered question: which extractor or FFmpeg invocation change is required when `ffprobe` exposes motion-vector side-data markers but omits the coordinate payload for the agreed public MP4 pair?
+- Highest-value unanswered question: which extractor surface or FFmpeg invocation change is required when `ffprobe` exposes motion-vector side-data markers but omits the coordinate payload for the agreed public MP4 pair?
 
 ## Reusable baseline
 
@@ -58,6 +58,69 @@ This project should not branch into UI polish or speculative parser work until t
   - the failure is narrower than environment bootstrap: `ffprobe` marks `Motion vectors` side data on 714 frames per input, but the JSON payload omits coordinate arrays, so machine-readable vectors remain unavailable
 - Changed variable recommended next:
   - extractor invocation/selection, not environment or input preparation
+
+## HEL-152 status in project context
+
+- Private/user-data validation is not proven.
+- This is not primarily blocked by missing private files yet; it is blocked by the unresolved public extraction lane.
+- The reusable private-data contract from `docs/INPUTS.md` is still valid:
+  - raw inputs belong under `/home/helionaut/srv/research-cache/18afd661ce11/datasets/user/raw/<run-id>/`
+  - prepared metadata belongs under `/home/helionaut/srv/research-cache/18afd661ce11/datasets/user/prepared/<run-id>/`
+  - the same manifest shape can be reused once secure provenance replaces public `source_url` fields
+- Do not spend the next issue on private-data reruns until the public extractor lane can produce non-empty machine-readable vectors.
+
+## HEL-153 synthesis
+
+### What is proven
+
+- The project intent is stable: ingest two MP4 files, extract codec motion vectors, and visualize/compare them reproducibly.
+- The environment contract is established in `docs/ENVIRONMENT.md` around the repo-local Docker wrapper and shared cache root `/home/helionaut/srv/research-cache/18afd661ce11`.
+- The input contract is established in `docs/INPUTS.md` for the public Big Buck Bunny pair and for the future private-data lane.
+- The public baseline command surface is fixed and reproducible:
+  - `scripts/prepare_public_inputs.sh`
+  - `python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json`
+- The public baseline successfully:
+  - prepares and fingerprints the agreed public MP4 pair
+  - records ffprobe sidecars and a normalized manifest
+  - renders codecview overlay artifacts for both inputs
+  - writes a compact failure report under `reports/out/public-baseline/`
+- The observed failure is specific, reproducible, and narrower than environment or input setup:
+  - `ffprobe` reports `Motion vectors` side-data markers on 714 frames for each public input
+  - the JSON payload still contains zero coordinate arrays, so `frames_with_vectors=0` and `total_vectors=0` for both files
+
+### What is blocked
+
+- The workflow does not yet meet the core project hypothesis because no stage produces non-empty machine-readable motion vectors.
+- Without vector payloads, the comparison lane cannot progress beyond codecview renders into a credible vector-backed comparison artifact.
+- A private/user-data rerun would not answer a new question yet; it would mainly repeat the same extractor failure on a different input pair.
+- Live Docker runtime proof is still unverified on this machine because the host lacks a `docker` CLI, but that is not the blocker that stopped the public baseline run on host tooling.
+
+### Exact next issue
+
+- Recommended next issue title: `Public extractor recovery: switch from ffprobe JSON export_mvs to an alternate FFmpeg motion-vector surface`
+- Strategic context:
+  - the project is blocked on extraction viability, not on environment bootstrap, input preparation, or UI work
+- Tactical next step:
+  - rerun the public Big Buck Bunny baseline while changing only the extractor surface used to obtain machine-readable vectors
+- Reuse from previous work:
+  - `manifests/public-baseline.json`
+  - `scripts/prepare_public_inputs.sh`
+  - `scripts/public_baseline.py`
+  - `reports/out/public-baseline/status.json`
+  - `reports/out/public-baseline/report.md`
+  - `/home/helionaut/srv/research-cache/18afd661ce11`
+- Changed variable:
+  - extractor surface, specifically moving away from the current `ffprobe -flags2 +export_mvs -show_frames -print_format json` path if it still omits coordinates
+- Hypothesis:
+  - an alternate FFmpeg-backed extraction surface will expose per-frame vector coordinates for the same public MP4 pair without changing inputs or environment
+- Success criterion:
+  - the public baseline writes non-empty vector JSON for both inputs, with at least one frame containing coordinate-bearing vectors that can feed the comparison stage
+- Abort condition:
+  - if two materially different FFmpeg-backed extraction surfaces still produce side-data markers without coordinates for the same public pair, stop and record that FFmpeg-side extraction is insufficient for this footage on this stack
+- Outputs:
+  - updated extractor command or script
+  - updated `reports/out/public-baseline/` evidence
+  - updated `docs/RESEARCH.md` naming whether FFmpeg remains viable or the project must escalate to a different parser/tool family
 
 ## Experiment ledger rules
 
