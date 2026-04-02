@@ -14,7 +14,7 @@ Build a research workflow to ingest two MP4 files, extract codec motion vectors,
 ## Reusable baseline
 
 - Known-good public baseline: a truthful public success proof is still not established, but HEL-151 now publishes a reusable stronger failure boundary in PR #5: `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json` writes render artifacts for both public MP4 inputs and ends at `motion-vector-payload-missing` with 714 frames of motion-vector side-data markers but zero exported vectors per input
-- Known-good private/user-data baseline: not established yet; HEL-152 now has a committed private-manifest staging path (`configs/input_sets/private-template.json` plus `python3 scripts/prepare_inputs.py --config ...`) but should not rerun on private data until the public baseline above becomes credible and reusable
+- Known-good private/user-data baseline: not established yet; HEL-152 now has a committed private staging path (`scripts/prepare_private_inputs.sh` plus `configs/input_sets/private-template.json`) and this host can bootstrap static `ffprobe`/`ffmpeg`, but it should not rerun on private data until the public baseline above becomes credible and reusable and the real user MP4 pair is staged
 - Reusable build/tooling baseline: repo-local Dockerfile plus `scripts/run_in_docker.sh` with shared cache mounts; live container proof still requires a Docker-capable host
 - Shared cache root: `/home/helionaut/srv/research-cache/18afd661ce11`
 
