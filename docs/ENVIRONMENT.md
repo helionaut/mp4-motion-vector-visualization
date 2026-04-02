@@ -10,60 +10,138 @@ This project must be reproducible across multiple Symphony issue workspaces and 
 
 Issue workspaces are disposable. Reusable environment decisions, heavy downloads, toolchains, datasets, and build outputs must not live only inside a single `HEL-*` workspace.
 
-## Decision rule
+## Chosen strategy
 
-- Default to `docker` for research/native-build tasks when any of these are true:
-  - the task compiles native code or depends on `apt`/system packages
-  - the build or test run is expensive enough that repeated host bootstrap would waste time or tokens
-  - the result must be reproducible across future agents or hosts
-- Use `host` only when:
-  - the stack is lightweight and already stable on the host
-  - the host bootstrap can be captured in a small repo-local script
-  - containerizing the task adds more complexity than reproducibility value
-- The decision must be recorded before repeated retries begin.
+- Selected strategy: `docker`
+- Why `docker` won:
+  - FFmpeg and related media tooling are native system dependencies, so host bootstrap drift would be expensive and hard to audit.
+  - The project is explicitly `research-heavy`, so a cache-mounted container baseline is a better long-term contract than host notes.
+  - Future issues need one command surface they can reuse without rediscovering package installs or hidden mount paths.
+- Why `host` was rejected:
+  - there is no existing stable host bootstrap in this repo
+  - repeating `apt`/system setup on disposable issue workspaces would violate the reproducibility goal
+  - the project guardrails explicitly default to Docker for this class of task
 
-## Current contract
+The environment contract is now the repo-local Docker image plus `scripts/run_in_docker.sh`. Heavy retries should use that contract instead of ad hoc host setup.
 
-- Strategy: `docker`
-- Status: `draft until HEL-149 locks the first known-good baseline`
-- Shared cache root: `/home/helionaut/srv/research-cache/18afd661ce11`
-- Stable subdirectories:
-  - downloads: `/home/helionaut/srv/research-cache/18afd661ce11/downloads`
-  - datasets: `/home/helionaut/srv/research-cache/18afd661ce11/datasets`
-  - toolchains: `/home/helionaut/srv/research-cache/18afd661ce11/toolchains`
-  - builds: `/home/helionaut/srv/research-cache/18afd661ce11/builds`
-  - artifacts: `/home/helionaut/srv/research-cache/18afd661ce11/artifacts`
-  - logs: `/home/helionaut/srv/research-cache/18afd661ce11/logs`
-  - docker state/volumes: `/home/helionaut/srv/research-cache/18afd661ce11/docker`
+## Image baseline
+
+Committed baseline:
+
+- `Dockerfile`
+- base image: `debian:bookworm-slim`
+- installed packages: `ffmpeg`, `python3`, `python3-venv`, `git`, `bash`, `ca-certificates`, `tini`
+- runtime user: a non-root `worker` user created from the caller's UID/GID at build time
+
+This is intentionally narrow. Optional plotting or notebook dependencies should be added only when a later issue proves they are required for the first render artifact.
+
+## Shared cache contract
+
+Canonical shared cache root:
+
+- `/home/helionaut/srv/research-cache/18afd661ce11`
+
+Stable subdirectories:
+
+- downloads: `/home/helionaut/srv/research-cache/18afd661ce11/downloads`
+- datasets: `/home/helionaut/srv/research-cache/18afd661ce11/datasets`
+- toolchains: `/home/helionaut/srv/research-cache/18afd661ce11/toolchains`
+- builds: `/home/helionaut/srv/research-cache/18afd661ce11/builds`
+- artifacts: `/home/helionaut/srv/research-cache/18afd661ce11/artifacts`
+- logs: `/home/helionaut/srv/research-cache/18afd661ce11/logs`
+- docker state: `/home/helionaut/srv/research-cache/18afd661ce11/docker`
+
+Wrapper behavior:
+
+- `scripts/run_in_docker.sh` creates the full directory layout before every `build`, `run`, or `dry-run`.
+- The repo checkout is mounted at `/workspace`.
+- The shared cache root is mounted at `/cache-root`.
+- Inside the container, these environment variables are always exported:
+  - `MMV_CACHE_ROOT=/cache-root`
+  - `MMV_DOWNLOADS_DIR=/cache-root/downloads`
+  - `MMV_DATASETS_DIR=/cache-root/datasets`
+  - `MMV_TOOLCHAINS_DIR=/cache-root/toolchains`
+  - `MMV_BUILDS_DIR=/cache-root/builds`
+  - `MMV_ARTIFACTS_DIR=/cache-root/artifacts`
+  - `MMV_LOGS_DIR=/cache-root/logs`
+  - `MMV_DOCKER_STATE_DIR=/cache-root/docker`
+
+Output discipline:
+
+- reusable downloads, datasets, build trees, and research artifacts go under the shared cache root
+- disposable repo edits, docs, and orchestration scripts stay in the issue workspace checkout
+- future agents may override the host cache root with `MMV_CACHE_ROOT`, but they should preserve the same subdirectory contract
+
+## Entry wrapper contract
+
+Primary entrypoint:
+
+- `scripts/run_in_docker.sh doctor`
+- `scripts/run_in_docker.sh dry-run`
+- `scripts/run_in_docker.sh build`
+- `scripts/run_in_docker.sh run -- <command>`
+- `scripts/run_in_docker.sh ffmpeg-version`
+
+Operational notes:
+
+- `doctor` prints the resolved repo path, Docker binary, image name, and cache locations
+- `dry-run` prints the exact `docker build` and `docker run` commands without requiring Docker to be installed
+- `build` and `run` fail fast with an explicit error if Docker is unavailable
+- `run` rebuilds the image before execution so future agents do not silently reuse a stale environment definition
 
 ## First environment target
 
-HEL-149 should produce the smallest reproducible container baseline that can:
+HEL-149 establishes the smallest reusable container baseline that can:
 
-- run FFmpeg/ffprobe against MP4 inputs
+- run FFmpeg and ffprobe against MP4 inputs
 - write extracted vector data and rendered artifacts to mounted cache-backed paths
-- expose one repo-local entry command future agents can reuse without host-specific guesswork
+- give future agents one repo-local command surface instead of undocumented host steps
 
-The first environment lane should not optimize performance or add optional tooling until the baseline extraction path is proven.
+The first environment lane does not claim the extraction path is solved. It only locks the environment needed to pursue that path reproducibly.
 
-## Expected mounted paths
+## Validation and handoff proof
 
-- repo workspace: disposable checkout for scripts and docs
-- shared datasets/artifacts/logs: mounted from `/home/helionaut/srv/research-cache/18afd661ce11`
-- output discipline: reusable downloads, datasets, and heavy build outputs must stay under the shared cache root
+Static validation committed in this repo:
 
-## Likely package surface
+- `python3 scripts/validate_intake_docs.py`
+- `python3 scripts/validate_environment_contract.py`
 
-Record and justify the final list in HEL-149, but the baseline should assume:
+The environment validator proves:
 
-- FFmpeg and ffprobe
-- Python 3 for orchestration/reporting helpers
-- optional image/video plotting dependencies only if the first render artifact requires them
+- the Dockerfile exists with the expected baseline packages
+- the wrapper is executable and exposes `doctor` plus `dry-run`
+- the dry-run output includes the cache mount contract and Docker invocation shape
+- the docs reference the same wrapper and cache contract that the validator checks
+
+Live runtime proof on a Docker-capable machine:
+
+```bash
+scripts/run_in_docker.sh ffmpeg-version
+scripts/run_in_docker.sh run ffprobe -version
+```
+
+These commands are the required starting point for future agents before any heavy extraction/build retry begins.
+
+## Known blocker on the current machine
+
+The current workspace host does not have a `docker` CLI available, so HEL-149 cannot honestly claim a locally executed container build/run proof from this machine alone.
+
+What is still proven here:
+
+- the Docker strategy is selected and documented
+- the repo-local Dockerfile and wrapper are committed
+- the cache layout is explicit and validated
+- future agents have a single command surface to reuse without hidden setup
+
+What still requires infrastructure:
+
+- one Docker-capable host needs to run `scripts/run_in_docker.sh ffmpeg-version` and `scripts/run_in_docker.sh run ffprobe -version`
+- once that succeeds, write the validation artifact and reuse the same wrapper for later experiment issues
 
 ## Reuse rules
 
 - Never leave the only copy of a useful baseline inside a disposable issue workspace.
 - Commit repo-local wrappers, manifests, patches, lockfiles, and runbooks.
 - If using `docker`, commit the Dockerfile and repo-local entry script; mount the shared cache root into the container.
-- If using `host`, commit `scripts/bootstrap_host_deps.sh` (or equivalent) before allowing repeated build retries.
+- If using `host`, commit `scripts/bootstrap_host_deps.sh` before allowing repeated build retries.
 - Every follow-up issue must say which environment baseline or cache paths it expects to reuse.
