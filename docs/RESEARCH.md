@@ -8,8 +8,8 @@ Build a research workflow to ingest two MP4 files, extract codec motion vectors,
 
 ## Current answer state
 
-- Overall verdict: `ffmpeg-decode-path-boundary-recorded`
-- Highest-value unanswered question: whether a libavcodec-backed extractor can serialize coordinate-bearing motion vectors now that the FFmpeg CLI decode path proves motion-vector side-data bytes exist on the agreed public MP4 pair
+- Overall verdict: `host-libavcodec-runtime-boundary-recorded`
+- Highest-value unanswered question: whether the committed host libavcodec extractor can serialize coordinate-bearing motion vectors on a machine that really exposes the FFmpeg development surface claimed by HEL-156
 
 ## Reusable baseline
 
@@ -167,6 +167,57 @@ This project should not branch into UI polish or speculative parser work until t
   - one deterministic coordinate-serialization command or helper
   - refreshed public-baseline vector/comparison evidence
   - an updated handoff that says whether the project can finally reopen the private-data lane
+
+## HEL-156 outcome
+
+### What shipped
+
+- The repo now carries a minimal host-side extractor at `tools/host_libavcodec_mv_extractor.c` that targets `AV_FRAME_DATA_MOTION_VECTORS` through `libavformat` / `libavcodec` / `libavutil`.
+- `scripts/bootstrap_host_libavcodec.sh` provides the explicit host bootstrap/build contract for this slice and fails with a specific message when the required FFmpeg development metadata is unavailable.
+- `scripts/public_baseline.py` now uses that host extractor surface for HEL-156, keeps the prepared public manifest and codecview render path stable, and writes host-slice progress/status artifacts to `.symphony/progress/HEL-156.json` plus `reports/out/public-baseline/status.json`.
+
+### What is proven
+
+- The changed variable stayed narrow: only the coordinate-serialization surface moved from the FFmpeg CLI boundary to a repo-local host `libavcodec` helper.
+- The prepared public baseline inputs, manifests, shared cache paths, and render/comparison directories remain the reuse surface.
+- The current machine reaches a tighter truthful runtime boundary than HEL-155:
+  - static `ffmpeg` / `ffprobe` binaries are present in the shared cache
+  - `gcc` is present
+  - the host does not expose `libavformat`, `libavcodec`, or `libavutil` through `pkg-config`
+  - the host-run extractor therefore cannot be compiled here, and the blocked state is now explicit: `host-libavcodec-dev-surface-missing`
+
+### What is still blocked
+
+- Coordinate-bearing vectors are still not proven end-to-end because the current machine cannot compile the new extractor against FFmpeg development libraries.
+- This means the original ingest/extract/compare ask is still unresolved; the project still lacks a validated coordinate-vector artifact on the prepared public pair.
+- The Docker contract is still documented but not live-proven on this host because Docker remains unavailable here.
+
+### Exact next issue
+
+- Recommended next issue title: `Host libavcodec extractor validation: rerun HEL-156 on a machine with FFmpeg development packages`
+- Strategic context:
+  - HEL-156 replaced the extractor surface in code, but the current host disproved the assumed runtime contract before coordinate serialization could be executed
+- Tactical next step:
+  - run the committed HEL-156 host bootstrap and baseline command unchanged on a machine where `pkg-config --exists libavformat libavcodec libavutil` succeeds
+- Reuse from previous work:
+  - `tools/host_libavcodec_mv_extractor.c`
+  - `scripts/bootstrap_host_libavcodec.sh`
+  - `scripts/public_baseline.py`
+  - `manifests/public-baseline.json`
+  - `.symphony/progress/HEL-156.json`
+  - `reports/out/public-baseline/status.json`
+  - `/home/helionaut/srv/research-cache/18afd661ce11`
+- Changed variable:
+  - runtime environment only, specifically moving from the current host with missing FFmpeg dev metadata to one with the required development surface installed
+- Hypothesis:
+  - on a correctly provisioned host, the committed libavcodec extractor will compile and reveal whether `AV_FRAME_DATA_MOTION_VECTORS` contains non-empty coordinate vectors for the prepared public pair
+- Success criterion:
+  - the unchanged HEL-156 command surface either emits non-empty coordinate vectors plus refreshed comparison artifacts or records a tighter library-level decode boundary after the extractor actually runs
+- Abort condition:
+  - if the extractor compiles and still emits zero vectors on the same prepared public pair, stop and record that exact library/runtime boundary instead of reopening private validation
+- Outputs:
+  - compile/run evidence for the committed host extractor
+  - refreshed vector/comparison artifacts or a tighter library-level blocker report
 
 ## Experiment ledger rules
 

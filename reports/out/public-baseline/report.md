@@ -2,14 +2,16 @@
 
 - Run id: `public-baseline`
 - Status: blocked
-- Blocked by: `ffmpeg-export-side-data-mvs-cli-lacks-coordinate-vectors`
-- Host command surface: `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-155.json`
-- Docker command surface: `scripts/run_in_docker.sh run -- python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-155.json`
+- Blocked by: `host-libavcodec-dev-surface-missing`
+- Host bootstrap command: `scripts/bootstrap_host_libavcodec.sh --output build/host/libavcodec_mv_extractor`
+- Host validation command: `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-156.json`
 - Notes:
-  - ffmpeg decode-path extraction completed for both public MP4 inputs
-  - codecview render artifacts were written
-  - motion-vector side-data bytes are present on the FFmpeg decode path, but the CLI still does not serialize coordinate-bearing vectors
+  - the host-run libavcodec extractor could not be built on this machine
+  - the prepared public baseline inputs and ffmpeg render surface remain unchanged
+  - missing pkg-config entries for libavformat/libavcodec/libavutil
+install the FFmpeg development packages for this host before rerunning the host extractor slice
 - Details:
-  - `bbb_480p_30s`: `{"frame_count": 720, "frames_with_motion_side_data": 714, "frames_with_vectors": 0, "total_motion_vector_payload_bytes": 66011680, "total_vectors": 0}`
-  - `bbb_1080p_30s`: `{"frame_count": 720, "frames_with_motion_side_data": 714, "frames_with_vectors": 0, "total_motion_vector_payload_bytes": 337375720, "total_vectors": 0}`
+  - `bootstrap_command`: `["scripts/bootstrap_host_libavcodec.sh", "--output", "build/host/libavcodec_mv_extractor"]`
+  - `ffmpeg_bin`: `"/home/helionaut/srv/research-cache/18afd661ce11/toolchains/ffmpeg-johnvansickle-static/ffmpeg"`
+  - `ffprobe_bin`: `"/home/helionaut/srv/research-cache/18afd661ce11/toolchains/ffmpeg-johnvansickle-static/ffprobe"`
 

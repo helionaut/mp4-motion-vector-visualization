@@ -18,5 +18,6 @@ Symphony-managed project: MP4 Motion Vector Visualization
 ## Public baseline entry point
 
 - `scripts/prepare_public_inputs.sh`: fetch the committed public MP4 pair and write `manifests/public-baseline.json`
+- `scripts/bootstrap_host_libavcodec.sh --output build/host/libavcodec_mv_extractor`: build the HEL-156 host-side coordinate extractor when FFmpeg development packages are available on the machine
 - `python3 scripts/public_baseline.py plan --manifest manifests/public-baseline.json`: print the exact extraction/render plan for the prepared public baseline
 - `python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json`: execute the public baseline against the prepared input manifest

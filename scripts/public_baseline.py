@@ -16,7 +16,8 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_MANIFEST = REPO_ROOT / "manifests" / "public-baseline.json"
-DEFAULT_PROGRESS_ARTIFACT = REPO_ROOT / ".symphony" / "progress" / "HEL-155.json"
+DEFAULT_PROGRESS_ARTIFACT = REPO_ROOT / ".symphony" / "progress" / "HEL-156.json"
+DEFAULT_HOST_EXTRACTOR_BIN = REPO_ROOT / "build" / "host" / "libavcodec_mv_extractor"
 FRAME_LINE_RE = re.compile(r"n:\s*(\d+).*?\btype:([A-Z])\b")
 MOTION_VECTOR_BYTES_RE = re.compile(r"side data - Motion vectors: \((\d+) bytes\)")
 
@@ -102,6 +103,19 @@ def resolve_binary_paths(manifest: dict[str, Any]) -> tuple[Path, Path]:
     return ffmpeg_bin, ffprobe_bin
 
 
+def resolve_host_extractor_binary() -> Path:
+    bootstrap_command = [
+        str(REPO_ROOT / "scripts" / "bootstrap_host_libavcodec.sh"),
+        "--output",
+        str(DEFAULT_HOST_EXTRACTOR_BIN),
+    ]
+    result = run_command(bootstrap_command, capture=True)
+    binary_path = Path(result.stdout.strip())
+    if not binary_path.is_file():
+        raise FileNotFoundError(f"expected host extractor binary at {binary_path}")
+    return binary_path
+
+
 def build_ffprobe_command(ffprobe_bin: Path, input_spec: dict[str, Any]) -> list[str]:
     return [
         str(ffprobe_bin),
@@ -134,6 +148,22 @@ def build_extract_command(ffmpeg_bin: Path, input_spec: dict[str, Any]) -> list[
         "-f",
         "null",
         "-",
+    ]
+
+
+def build_libavcodec_extract_command(
+    extractor_bin: Path,
+    input_spec: dict[str, Any],
+    output_path: Path,
+) -> list[str]:
+    return [
+        str(extractor_bin),
+        "--input",
+        input_spec["raw_path"],
+        "--input-name",
+        input_spec["name"],
+        "--output",
+        str(output_path),
     ]
 
 
@@ -330,6 +360,7 @@ def build_comparison_summary(per_input: dict[str, dict[str, Any]]) -> dict[str, 
                 "frames_with_vectors": summary["frames_with_vectors"],
                 "frames_with_motion_side_data": summary["frames_with_motion_side_data"],
                 "frame_count": summary["frame_count"],
+                "coordinate_vectors_available": summary.get("coordinate_vectors_available", False),
                 "total_motion_vector_payload_bytes": summary.get("total_motion_vector_payload_bytes", 0),
                 "mean_motion_vector_payload_bytes": summary.get("mean_motion_vector_payload_bytes", 0.0),
             }
@@ -363,25 +394,25 @@ def build_comparison_summary(per_input: dict[str, dict[str, Any]]) -> dict[str, 
 
 def build_comparison_svg(comparison_summary: dict[str, Any]) -> str:
     inputs = comparison_summary["inputs"]
-    max_payload_bytes = max(item["total_motion_vector_payload_bytes"] for item in inputs) or 1
-    max_side_data_frames = max(item["frames_with_motion_side_data"] for item in inputs) or 1
+    max_vector_count = max(item["total_vectors"] for item in inputs) or 1
+    max_vector_frames = max(item["frames_with_vectors"] for item in inputs) or 1
     lines = [
         "<svg xmlns='http://www.w3.org/2000/svg' width='720' height='260' viewBox='0 0 720 260'>",
         "<rect width='720' height='260' fill='#f7f4ea' />",
-        "<text x='32' y='40' font-family='monospace' font-size='20' fill='#1f2933'>FFmpeg export_side_data MVS Comparison</text>",
+        "<text x='32' y='40' font-family='monospace' font-size='20' fill='#1f2933'>Host libavcodec MV Comparison</text>",
     ]
     colors = ["#2563eb", "#dc2626"]
     for index, item in enumerate(inputs):
         bar_y = 70 + index * 90
-        payload_width = int((item["total_motion_vector_payload_bytes"] / max_payload_bytes) * 280)
-        frame_width = int((item["frames_with_motion_side_data"] / max_side_data_frames) * 280)
+        vector_width = int((item["total_vectors"] / max_vector_count) * 280)
+        frame_width = int((item["frames_with_vectors"] / max_vector_frames) * 280)
         lines.extend(
             [
                 f"<text x='32' y='{bar_y}' font-family='monospace' font-size='16' fill='#1f2933'>{item['name']}</text>",
-                f"<rect x='240' y='{bar_y - 16}' width='{payload_width}' height='18' fill='{colors[index]}' />",
-                f"<text x='530' y='{bar_y - 2}' font-family='monospace' font-size='13' fill='#1f2933'>mv bytes: {item['total_motion_vector_payload_bytes']}</text>",
+                f"<rect x='240' y='{bar_y - 16}' width='{vector_width}' height='18' fill='{colors[index]}' />",
+                f"<text x='530' y='{bar_y - 2}' font-family='monospace' font-size='13' fill='#1f2933'>vectors: {item['total_vectors']}</text>",
                 f"<rect x='240' y='{bar_y + 14}' width='{frame_width}' height='18' fill='{colors[index]}' opacity='0.55' />",
-                f"<text x='530' y='{bar_y + 28}' font-family='monospace' font-size='13' fill='#1f2933'>frames w/ mv side data: {item['frames_with_motion_side_data']}</text>",
+                f"<text x='530' y='{bar_y + 28}' font-family='monospace' font-size='13' fill='#1f2933'>frames w/ vectors: {item['frames_with_vectors']}</text>",
             ]
         )
     lines.append("</svg>")
@@ -403,8 +434,9 @@ def write_status_report(
         "status": status,
         "blocked_by": blocked_by,
         "missing_tools": missing_tools or [],
-        "expected_command_surface": "scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-155.json",
-        "docker_command_surface": "scripts/run_in_docker.sh run -- python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-155.json",
+        "host_bootstrap_command": "scripts/bootstrap_host_libavcodec.sh --output build/host/libavcodec_mv_extractor",
+        "expected_command_surface": "scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-156.json",
+        "docker_command_surface": "not-used-in-hel-156-host-slice",
         "generated_at": utc_now(),
         "notes": notes or [],
         "details": details or {},
@@ -424,10 +456,10 @@ def write_status_report(
     if missing_tools:
         report_lines.append(f"- Missing tools: `{', '.join(missing_tools)}`")
     report_lines.append(
-        "- Host command surface: `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-155.json`"
+        "- Host bootstrap command: `scripts/bootstrap_host_libavcodec.sh --output build/host/libavcodec_mv_extractor`"
     )
     report_lines.append(
-        "- Docker command surface: `scripts/run_in_docker.sh run -- python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-155.json`"
+        "- Host validation command: `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-156.json`"
     )
     if notes:
         report_lines.append("- Notes:")
@@ -492,29 +524,67 @@ def run_baseline(manifest: dict[str, Any], *, progress_artifact: Path) -> int:
         )
         return 2
 
+    try:
+        extractor_bin = resolve_host_extractor_binary()
+    except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+        error_text = ""
+        if isinstance(exc, subprocess.CalledProcessError):
+            error_text = (exc.stderr or exc.stdout or str(exc)).strip()
+        else:
+            error_text = str(exc)
+        write_progress_artifact(
+            progress_artifact,
+            status="blocked",
+            current_step="host libavcodec extractor bootstrap failed",
+            completed=0,
+            total=estimated_total_frames,
+            metrics={"error": error_text},
+            artifacts=shared_artifacts,
+        )
+        write_status_report(
+            manifest,
+            artifact_paths["report_dir"],
+            status="blocked",
+            blocked_by="host-libavcodec-dev-surface-missing",
+            notes=[
+                "the host-run libavcodec extractor could not be built on this machine",
+                "the prepared public baseline inputs and ffmpeg render surface remain unchanged",
+                error_text or "bootstrap failed without stderr output",
+            ],
+            details={
+                "bootstrap_command": [
+                    "scripts/bootstrap_host_libavcodec.sh",
+                    "--output",
+                    "build/host/libavcodec_mv_extractor",
+                ],
+                "ffmpeg_bin": str(ffmpeg_bin),
+                "ffprobe_bin": str(ffprobe_bin),
+            },
+        )
+        return 4
+
     per_input_summary: dict[str, dict[str, Any]] = {}
     command_log: list[dict[str, Any]] = []
     processed_frames = 0
 
     for index, input_spec in enumerate(manifest["inputs"], start=1):
-        extract_log_path = artifact_paths["vectors_dir"] / f"{input_spec['name']}.ffmpeg-showinfo.log"
-        extract_command = build_extract_command(ffmpeg_bin, input_spec)
+        extract_summary_path = artifact_paths["vectors_dir"] / f"{input_spec['name']}.json"
+        extract_command = build_libavcodec_extract_command(extractor_bin, input_spec, extract_summary_path)
         command_log.append({"step": "extract", "input": input_spec["name"], "command": extract_command})
-        log_text = run_extract_command(
-            extract_command,
-            log_path=extract_log_path,
-            progress_path=progress_artifact,
-            input_name=input_spec["name"],
-            processed_frames_before=processed_frames,
-            total_frames=estimated_total_frames,
+        write_progress_artifact(
+            progress_artifact,
+            status="running",
+            current_step=f"extracting coordinate vectors for {input_spec['name']} ({index}/{len(manifest['inputs'])})",
+            completed=processed_frames,
+            total=estimated_total_frames,
+            metrics={"input": input_spec["name"]},
             artifacts=shared_artifacts,
         )
-        summary = summarize_ffmpeg_showinfo(log_text)
+        run_command(extract_command)
+        summary = json.loads(extract_summary_path.read_text())
         summary["source_path"] = input_spec["raw_path"]
         summary["raw_sha256"] = input_spec.get("raw_sha256")
-        summary["showinfo_log"] = str(extract_log_path.relative_to(REPO_ROOT))
-        summary_path = artifact_paths["vectors_dir"] / f"{input_spec['name']}.summary.json"
-        summary_path.write_text(json.dumps(summary, indent=2) + "\n")
+        summary["extractor_binary"] = str(extractor_bin)
         per_input_summary[input_spec["name"]] = summary
         processed_frames += summary["frame_count"]
         write_progress_artifact(
@@ -527,7 +597,8 @@ def run_baseline(manifest: dict[str, Any], *, progress_artifact: Path) -> int:
                 "input": input_spec["name"],
                 "frames_processed": processed_frames,
                 "frames_with_motion_side_data": summary["frames_with_motion_side_data"],
-                "motion_vector_payload_bytes": summary["total_motion_vector_payload_bytes"],
+                "frames_with_vectors": summary["frames_with_vectors"],
+                "total_vectors": summary["total_vectors"],
             },
             artifacts=shared_artifacts,
         )
@@ -539,14 +610,9 @@ def run_baseline(manifest: dict[str, Any], *, progress_artifact: Path) -> int:
 
     if sum(item["total_vectors"] for item in per_input_summary.values()) == 0:
         had_motion_side_data = any(item["frames_with_motion_side_data"] > 0 for item in per_input_summary.values())
-        had_motion_vector_payload_bytes = any(
-            item["total_motion_vector_payload_bytes"] > 0 for item in per_input_summary.values()
-        )
-        blocked_by = "ffmpeg-export-side-data-mvs-cli-lacks-coordinate-vectors"
+        blocked_by = "host-libavcodec-motion-vectors-empty"
         if not had_motion_side_data:
-            blocked_by = "ffmpeg-export-side-data-mvs-no-side-data"
-        elif not had_motion_vector_payload_bytes:
-            blocked_by = "ffmpeg-export-side-data-mvs-zero-payload-bytes"
+            blocked_by = "host-libavcodec-no-motion-vector-side-data"
         comparison_summary = build_comparison_summary(per_input_summary)
         comparison_summary["generated_at"] = utc_now()
         comparison_summary["command_log"] = command_log
@@ -557,7 +623,7 @@ def run_baseline(manifest: dict[str, Any], *, progress_artifact: Path) -> int:
         write_progress_artifact(
             progress_artifact,
             status="blocked",
-            current_step="ffmpeg decode path finished without coordinate-bearing vectors",
+            current_step="host libavcodec extractor finished without coordinate-bearing vectors",
             completed=processed_frames,
             total=estimated_total_frames,
             metrics={
@@ -565,9 +631,7 @@ def run_baseline(manifest: dict[str, Any], *, progress_artifact: Path) -> int:
                 "frames_with_motion_side_data": sum(
                     item["frames_with_motion_side_data"] for item in per_input_summary.values()
                 ),
-                "motion_vector_payload_bytes": sum(
-                    item["total_motion_vector_payload_bytes"] for item in per_input_summary.values()
-                ),
+                "total_vectors": 0,
                 "coordinate_vectors_available": False,
             },
             artifacts={
@@ -582,16 +646,12 @@ def run_baseline(manifest: dict[str, Any], *, progress_artifact: Path) -> int:
             status="blocked",
             blocked_by=blocked_by,
             notes=[
-                "ffmpeg decode-path extraction completed for both public MP4 inputs",
+                "host libavcodec extraction completed for both public MP4 inputs",
                 "codecview render artifacts were written",
                 (
-                    "motion-vector side-data bytes are present on the FFmpeg decode path, but the CLI still does not serialize coordinate-bearing vectors"
-                    if had_motion_vector_payload_bytes
-                    else (
-                        "motion-vector side-data markers are present, but the decode path reported zero payload bytes"
-                        if had_motion_side_data
-                        else "no motion-vector side-data markers were exported for either public MP4 input on the decode path"
-                    )
+                    "motion-vector side-data is visible through libavcodec, but the runtime still emitted zero coordinate-bearing vectors"
+                    if had_motion_side_data
+                    else "libavcodec did not surface motion-vector side-data on either prepared public input"
                 ),
             ],
             details={
@@ -600,7 +660,6 @@ def run_baseline(manifest: dict[str, Any], *, progress_artifact: Path) -> int:
                     "frames_with_motion_side_data": summary["frames_with_motion_side_data"],
                     "frames_with_vectors": summary["frames_with_vectors"],
                     "total_vectors": summary["total_vectors"],
-                    "total_motion_vector_payload_bytes": summary["total_motion_vector_payload_bytes"],
                 }
                 for name, summary in per_input_summary.items()
             },
@@ -621,9 +680,10 @@ def run_baseline(manifest: dict[str, Any], *, progress_artifact: Path) -> int:
         artifact_paths["report_dir"],
         status="success",
         notes=[
-            "public baseline extraction completed from the prepared HEL-150 manifest",
+            "public baseline extraction completed from the prepared HEL-150 manifest via the host libavcodec extractor",
             f"ffmpeg bin: {ffmpeg_bin}",
             f"ffprobe bin: {ffprobe_bin}",
+            f"extractor bin: {extractor_bin}",
         ],
     )
     write_progress_artifact(
@@ -648,13 +708,13 @@ def run_baseline(manifest: dict[str, Any], *, progress_artifact: Path) -> int:
         "",
         f"- Run id: `{manifest['run_id']}`",
         "- Status: success",
-        "- Proven path: prepared public MP4 manifest -> ffmpeg -export_side_data +mvs decode path -> codecview renders -> SVG comparison summary",
+        "- Proven path: prepared public MP4 manifest -> host libavcodec motion-vector extractor -> codecview renders -> SVG comparison summary",
         f"- Input manifest: `{Path(paths['manifest_path']).name}`",
         "- Inputs:",
     ]
     for item in comparison_summary["inputs"]:
         report_lines.append(
-            f"  - `{item['name']}`: {item['total_motion_vector_payload_bytes']} motion-vector bytes across {item['frames_with_motion_side_data']}/{item['frame_count']} frames"
+            f"  - `{item['name']}`: {item['total_vectors']} coordinate vectors across {item['frames_with_vectors']}/{item['frame_count']} frames"
         )
     report_lines.extend(
         [
@@ -675,9 +735,10 @@ def print_plan(manifest: dict[str, Any]) -> int:
     plan = {
         "run_id": manifest["run_id"],
         "prepare_command": "scripts/prepare_public_inputs.sh",
-        "run_command": "python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-155.json",
-        "docker_run_command": "scripts/run_in_docker.sh run -- python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-155.json",
-        "extractor_surface": "ffmpeg -export_side_data +mvs -vf showinfo",
+        "host_bootstrap_command": "scripts/bootstrap_host_libavcodec.sh --output build/host/libavcodec_mv_extractor",
+        "run_command": "python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-156.json",
+        "docker_run_command": "not-used-in-hel-156-host-slice",
+        "extractor_surface": "host libavcodec AV_FRAME_DATA_MOTION_VECTORS",
         "inputs": [
             {
                 "name": input_spec["name"],

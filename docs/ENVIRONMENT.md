@@ -138,6 +138,36 @@ What still requires infrastructure:
 - one Docker-capable host needs to run `scripts/run_in_docker.sh ffmpeg-version` and `scripts/run_in_docker.sh run ffprobe -version`
 - once that succeeds, write the validation artifact and reuse the same wrapper for later experiment issues
 
+## HEL-156 host extractor boundary
+
+HEL-156 deliberately changed the execution contract for one narrow slice: keep the prepared public inputs and FFmpeg render surface fixed while attempting coordinate serialization through a host-run `libavcodec` helper.
+
+Committed host slice assets:
+
+- `tools/host_libavcodec_mv_extractor.c`
+- `scripts/bootstrap_host_libavcodec.sh`
+- `python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-156.json`
+
+What this slice proves on the current machine:
+
+- the repo now carries a minimal host extractor surface that targets `AV_FRAME_DATA_MOTION_VECTORS`
+- the host validation path is deterministic and machine-readable
+- the current machine does not actually satisfy the issue's claimed host dev-toolchain contract, because `pkg-config` cannot resolve `libavformat`, `libavcodec`, or `libavutil`
+
+Exact current host boundary:
+
+- cached static FFmpeg binaries are available under `/home/helionaut/srv/research-cache/18afd661ce11/toolchains/ffmpeg-johnvansickle-static/`
+- `gcc` is available
+- the FFmpeg development metadata required to compile the host extractor is not available through `pkg-config`
+- HEL-156 therefore stops at `host-libavcodec-dev-surface-missing` and records that boundary in `reports/out/public-baseline/status.json` plus `.symphony/progress/HEL-156.json`
+
+If a later machine genuinely has the required host FFmpeg/libav development packages installed, rerun:
+
+```bash
+scripts/bootstrap_host_libavcodec.sh --output build/host/libavcodec_mv_extractor
+python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-156.json
+```
+
 ## Extractor follow-up reuse contract
 
 The next public extractor recovery slice must keep this environment contract fixed while changing only the extraction surface.
