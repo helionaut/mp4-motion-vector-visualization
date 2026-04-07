@@ -84,7 +84,27 @@ class PublicBaselineTests(unittest.TestCase):
         self.assertEqual(comparison["delta"]["vector_count"], 30)
         self.assertEqual(comparison["delta"]["motion_vector_payload_bytes"], 300)
         self.assertIn("input-a", svg)
-        self.assertIn("mv bytes: 400", svg)
+        self.assertIn("vectors: 40", svg)
+
+    def test_build_libavcodec_extract_command(self) -> None:
+        command = public_baseline.build_libavcodec_extract_command(
+            Path("/tmp/extractor"),
+            {"name": "input-a", "raw_path": "/tmp/input-a.mp4"},
+            Path("/tmp/output.json"),
+        )
+
+        self.assertEqual(
+            command,
+            [
+                "/tmp/extractor",
+                "--input",
+                "/tmp/input-a.mp4",
+                "--input-name",
+                "input-a",
+                "--output",
+                "/tmp/output.json",
+            ],
+        )
 
     def test_summarize_ffmpeg_showinfo_tracks_payload_bytes(self) -> None:
         log_text = """
@@ -166,7 +186,7 @@ class PublicBaselineTests(unittest.TestCase):
 
         written = "".join(call.args[0] for call in mock_write.call_args_list)
         self.assertIn("scripts/prepare_public_inputs.sh", written)
-        self.assertIn("scripts/run_in_docker.sh run -- python3 scripts/public_baseline.py run", written)
+        self.assertIn("scripts/bootstrap_host_libavcodec.sh --output build/host/libavcodec_mv_extractor", written)
         self.assertIn("/tmp/a.mp4", written)
 
 

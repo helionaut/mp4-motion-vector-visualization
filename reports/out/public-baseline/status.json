@@ -1,30 +1,24 @@
 {
   "run_id": "public-baseline",
   "status": "blocked",
-  "blocked_by": "ffmpeg-export-side-data-mvs-cli-lacks-coordinate-vectors",
+  "blocked_by": "host-libavcodec-dev-surface-missing",
   "missing_tools": [],
-  "expected_command_surface": "scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-155.json",
-  "docker_command_surface": "scripts/run_in_docker.sh run -- python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-155.json",
-  "generated_at": "2026-04-02T19:22:34+00:00",
+  "host_bootstrap_command": "scripts/bootstrap_host_libavcodec.sh --output build/host/libavcodec_mv_extractor",
+  "expected_command_surface": "scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-156.json",
+  "docker_command_surface": "not-used-in-hel-156-host-slice",
+  "generated_at": "2026-04-07T19:05:58+00:00",
   "notes": [
-    "ffmpeg decode-path extraction completed for both public MP4 inputs",
-    "codecview render artifacts were written",
-    "motion-vector side-data bytes are present on the FFmpeg decode path, but the CLI still does not serialize coordinate-bearing vectors"
+    "the host-run libavcodec extractor could not be built on this machine",
+    "the prepared public baseline inputs and ffmpeg render surface remain unchanged",
+    "missing pkg-config entries for libavformat/libavcodec/libavutil\ninstall the FFmpeg development packages for this host before rerunning the host extractor slice"
   ],
   "details": {
-    "bbb_480p_30s": {
-      "frame_count": 720,
-      "frames_with_motion_side_data": 714,
-      "frames_with_vectors": 0,
-      "total_vectors": 0,
-      "total_motion_vector_payload_bytes": 66011680
-    },
-    "bbb_1080p_30s": {
-      "frame_count": 720,
-      "frames_with_motion_side_data": 714,
-      "frames_with_vectors": 0,
-      "total_vectors": 0,
-      "total_motion_vector_payload_bytes": 337375720
-    }
+    "bootstrap_command": [
+      "scripts/bootstrap_host_libavcodec.sh",
+      "--output",
+      "build/host/libavcodec_mv_extractor"
+    ],
+    "ffmpeg_bin": "/home/helionaut/srv/research-cache/18afd661ce11/toolchains/ffmpeg-johnvansickle-static/ffmpeg",
+    "ffprobe_bin": "/home/helionaut/srv/research-cache/18afd661ce11/toolchains/ffmpeg-johnvansickle-static/ffprobe"
   }
 }
