@@ -10,7 +10,11 @@ const browserPath =
   process.env.PLAYWRIGHT_CHROMIUM_PATH ||
   "/home/helionaut/.cache/ms-playwright/chromium-1217/chrome-linux64/chrome";
 const serverPort = Number(process.env.BROWSER_DEMO_PORT || "4173");
-const baseUrl = `http://127.0.0.1:${serverPort}/browser-demo/`;
+const browserBasePath = process.env.BROWSER_DEMO_BASE_PATH || "/";
+const normalizedBasePath = browserBasePath.endsWith("/")
+  ? browserBasePath
+  : `${browserBasePath}/`;
+const baseUrl = `http://127.0.0.1:${serverPort}${normalizedBasePath}`;
 const screenshotDir = path.join(repoRoot, ".symphony", "screenshots");
 const fixtureA =
   process.env.BROWSER_DEMO_FILE_A ||
@@ -26,7 +30,7 @@ async function ensureFixtures() {
 }
 
 function startServer() {
-  return spawn("python3", ["-m", "http.server", String(serverPort)], {
+  return spawn("python3", ["-m", "http.server", String(serverPort), "--directory", "browser-demo"], {
     cwd: repoRoot,
     stdio: "ignore"
   });
@@ -68,7 +72,7 @@ async function runDesktopCheck() {
   }
 
   await page.screenshot({
-    path: path.join(screenshotDir, "HEL-158-desktop.png"),
+    path: path.join(screenshotDir, "HEL-159-desktop.png"),
     fullPage: true
   });
   await browser.close();
@@ -90,7 +94,7 @@ async function runMobileCheck() {
   }
 
   await page.screenshot({
-    path: path.join(screenshotDir, "HEL-158-mobile.png"),
+    path: path.join(screenshotDir, "HEL-159-mobile.png"),
     fullPage: true
   });
   await browser.close();
@@ -109,8 +113,8 @@ try {
         status: "ok",
         baseUrl,
         screenshots: [
-          ".symphony/screenshots/HEL-158-desktop.png",
-          ".symphony/screenshots/HEL-158-mobile.png"
+          ".symphony/screenshots/HEL-159-desktop.png",
+          ".symphony/screenshots/HEL-159-mobile.png"
         ]
       },
       null,

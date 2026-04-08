@@ -1,0 +1,61 @@
+name: Deploy Browser Demo to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - "eugeniy/**"
+    paths:
+      - "browser-demo/**"
+      - ".github/workflows/deploy-pages.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/validate_browser_demo.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run browser demo unit tests
+        run: npm test
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/eugeniy/')
+    environment:
+      name: github-pages
+    steps:
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload static browser demo artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./browser-demo
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
