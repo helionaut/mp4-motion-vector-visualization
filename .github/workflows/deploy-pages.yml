@@ -5,6 +5,12 @@ on:
     branches:
       - main
       - "eugeniy/**"
+    paths:
+      - "browser-demo/**"
+      - ".github/workflows/deploy-pages.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/validate_browser_demo.mjs"
   workflow_dispatch:
 
 permissions:
@@ -17,8 +23,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  validate:
     runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run browser demo unit tests
+        run: npm test
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    if: github.event.repository.private == false && github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
