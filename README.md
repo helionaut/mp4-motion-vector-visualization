@@ -22,6 +22,7 @@ Symphony-managed project: MP4 Motion Vector Visualization
 - open `http://localhost:4173/browser-demo/`
 - use the pair-upload fallback lane to load two MP4 files locally
 - the overlay mode is currently `optical-flow-approximation`, not codec motion vectors
+- after merge to `main`, GitHub Pages publishes the same static demo from `browser-demo/`
 
 ## Public baseline entry point
 
