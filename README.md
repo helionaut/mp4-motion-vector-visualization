@@ -23,6 +23,8 @@ Symphony-managed project: MP4 Motion Vector Visualization
 - use the pair-upload fallback lane to load two MP4 files locally
 - the overlay mode is currently `optical-flow-approximation`, not codec motion vectors
 - GitHub Pages deploys the contents of `browser-demo/` as the site root for review
+- live review deploy: `https://helionaut.github.io/mp4-motion-vector-visualization-review/`
+- review Pages repo: `https://github.com/helionaut/mp4-motion-vector-visualization-review`
 
 ## Public baseline entry point
 
