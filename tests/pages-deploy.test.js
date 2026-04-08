@@ -7,6 +7,7 @@ test("GitHub Pages workflow deploys the browser demo directory from main", async
 
   assert.match(workflow, /name:\s+Deploy browser demo to GitHub Pages/);
   assert.match(workflow, /push:\s*\n\s*branches:\s*\n\s*-\s+main/);
+  assert.match(workflow, /-\s+"eugeniy\/\*\*"/);
   assert.match(workflow, /uses:\s+actions\/configure-pages@v5/);
   assert.match(workflow, /enablement:\s+true/);
   assert.match(workflow, /uses:\s+actions\/upload-pages-artifact@v3/);
