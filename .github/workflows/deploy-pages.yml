@@ -44,7 +44,7 @@ jobs:
   deploy:
     needs: validate
     runs-on: ubuntu-latest
-    if: github.event.repository.private == false && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/eugeniy/'))
+    if: github.event.repository.private == false && github.ref == 'refs/heads/main'
     environment:
       name: github-pages
     steps:
