@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Browser Motion Demo</title>
+    <link rel="stylesheet" href="./app.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <p class="eyebrow">Browser MVP</p>
+        <h1>Inspect the split pair and judge the motion story directly.</h1>
+        <p class="lede">
+          This first slice keeps the workflow on the client machine. It plays a
+          user-provided MP4 pair in the browser and overlays an honest
+          <strong>optical-flow approximation</strong> computed from decoded
+          frames in a worker.
+        </p>
+      </section>
+
+      <section class="panel uploader">
+        <div>
+          <h2>1. Source selection</h2>
+          <p>
+            The UI can accept a single Insta360 source file, but this MVP does
+            not yet perform a truthful browser-side split into the derived MP4
+            pair.
+          </p>
+          <label class="field">
+            <span>Single source file</span>
+            <input id="source-file" type="file" accept=".mp4,.insv,video/*" />
+          </label>
+          <button id="attempt-split" type="button">Attempt split</button>
+          <p id="split-status" class="inline-status" aria-live="polite"></p>
+        </div>
+
+        <div>
+          <h2>2. Pair upload fallback</h2>
+          <p>
+            Upload the already-derived pair to continue the browser demo
+            without server-side processing.
+          </p>
+          <label class="field">
+            <span>Left / front stream MP4</span>
+            <input id="pair-a" type="file" accept=".mp4,video/mp4,video/*" />
+          </label>
+          <label class="field">
+            <span>Right / back stream MP4</span>
+            <input id="pair-b" type="file" accept=".mp4,video/mp4,video/*" />
+          </label>
+          <button id="load-pair" type="button">Load pair</button>
+        </div>
+      </section>
+
+      <section class="panel controls">
+        <div>
+          <h2>3. Playback and overlay</h2>
+          <p class="mode-pill">
+            Visualization mode:
+            <strong id="visualization-mode">optical-flow-approximation</strong>
+          </p>
+        </div>
+        <div class="control-grid">
+          <label>
+            <input id="overlay-toggle" type="checkbox" checked />
+            Show motion overlay
+          </label>
+          <label>
+            <input id="sync-toggle" type="checkbox" checked />
+            Keep players synchronized
+          </label>
+          <label>
+            Sample stride
+            <input id="sample-stride" type="range" min="1" max="6" step="1" value="3" />
+          </label>
+        </div>
+      </section>
+
+      <section class="panel status-panel">
+        <h2>Status</h2>
+        <div id="status-badge" class="status-badge">Idle</div>
+        <p id="status-detail" class="status-detail">
+          Select files to begin.
+        </p>
+        <ol id="status-log" class="status-log"></ol>
+      </section>
+
+      <section class="viewer-grid">
+        <article class="panel viewer-card">
+          <header>
+            <h2>Stream A</h2>
+            <p id="meta-a" class="viewer-meta">No file loaded</p>
+          </header>
+          <div class="video-stack">
+            <video id="video-a" controls muted playsinline></video>
+            <canvas id="overlay-a" class="overlay"></canvas>
+          </div>
+        </article>
+
+        <article class="panel viewer-card">
+          <header>
+            <h2>Stream B</h2>
+            <p id="meta-b" class="viewer-meta">No file loaded</p>
+          </header>
+          <div class="video-stack">
+            <video id="video-b" controls muted playsinline></video>
+            <canvas id="overlay-b" class="overlay"></canvas>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
