@@ -8,8 +8,8 @@ Build a research workflow to ingest two MP4 files, extract codec motion vectors,
 
 ## Current answer state
 
-- Overall verdict: `host-libavcodec-runtime-boundary-recorded`
-- Highest-value unanswered question: whether the committed host libavcodec extractor can serialize coordinate-bearing motion vectors on a machine that really exposes the FFmpeg development surface claimed by HEL-156
+- Overall verdict: `private-lane-proven-on-host-with-compact-summary-sidecars`
+- Highest-value unanswered question: whether the public lane should be rerun on this same host so the repo also carries a refreshed public success artifact, not only the private success proof
 
 ## Reusable baseline
 
@@ -218,6 +218,63 @@ This project should not branch into UI polish or speculative parser work until t
 - Outputs:
   - compile/run evidence for the committed host extractor
   - refreshed vector/comparison artifacts or a tighter library-level blocker report
+
+## HEL-157 outcome
+
+### What shipped
+
+- `tools/host_libavcodec_mv_extractor.c` now writes a compact `<vectors>.summary.json` sidecar alongside the full coordinate-vector JSON artifact.
+- `scripts/public_baseline.py` now requests that sidecar through `--summary-output`, prefers it during readback, and falls back to the full vector JSON only when the sidecar is absent.
+- The runner now writes manifest-aware report/status text instead of hardcoding the stale HEL-156 public-baseline command narrative into every run.
+
+### What is proven
+
+- The changed variable stayed narrow: only the artifact/summarization path changed after HEL-156's host extractor and the staged private pair were already fixed.
+- On this WSL machine, the private lane now completes end-to-end against the staged shared-cache pair under `/home/helionaut/srv/research-cache/18afd661ce11/datasets/user/raw/user-validation/`.
+- The previous multi-GB Python bottleneck is removed in practice:
+  - `reports/out/user-validation/vectors/input_a.json`: `3,284,375,590` bytes
+  - `reports/out/user-validation/vectors/input_b.json`: `3,284,046,880` bytes
+  - Python advanced past those artifacts by consuming the compact sidecars instead of `json.loads(...)` on the full files
+- The private run now publishes truthful coordinate-vector evidence for both inputs:
+  - `input_a`: `11,597,086` vectors across `253/270` frames
+  - `input_b`: `11,590,595` vectors across `253/270` frames
+- The comparison lane is now proven on the private inputs as well:
+  - `reports/out/user-validation/comparison/summary.json`
+  - `reports/out/user-validation/comparison/summary.svg`
+  - `reports/out/user-validation/status.json`
+  - `reports/out/user-validation/report.md`
+
+### What is still open
+
+- HEL-157 proves the original ingest/extract/compare ask on the private lane for this host, but the repo history still carries a stale public-host blocker narrative from HEL-156 until the public artifacts are refreshed from the now-working host.
+- Docker runtime proof is still not part of this slice; the successful proof here is host-based on the provisioned WSL machine.
+
+### Exact next issue
+
+- Recommended next issue title: `Public artifact refresh: rerun the host libavcodec baseline with compact summary sidecars on the provisioned WSL host`
+- Strategic context:
+  - the private lane is now truthfully proven, but repo-facing public artifacts and docs still overemphasize the superseded HEL-156 machine blocker
+- Tactical next step:
+  - rerun the unchanged public pair on this same host so `reports/out/public-baseline/` reflects the now-proven host extractor plus compact-summary contract
+- Reuse from previous work:
+  - `tools/host_libavcodec_mv_extractor.c`
+  - `scripts/public_baseline.py`
+  - `scripts/bootstrap_host_libavcodec.sh`
+  - `manifests/public-baseline.json`
+  - `reports/out/user-validation/`
+  - `.symphony/validation/HEL-157.json`
+  - `/home/helionaut/srv/research-cache/18afd661ce11`
+- Changed variable:
+  - report/artifact refresh target only, moving from the private validation manifest back to the prepared public manifest on the same working host
+- Hypothesis:
+  - the same host that completed HEL-157 private validation will also refresh the public evidence without reopening the earlier environment debate
+- Success criterion:
+  - the public rerun completes with non-empty coordinate-vector evidence plus refreshed comparison/report artifacts on this same host
+- Abort condition:
+  - if the public rerun unexpectedly fails on this host, stop and record the exact divergence from the successful private run instead of speculating
+- Outputs:
+  - refreshed `reports/out/public-baseline/` evidence
+  - updated docs/handoff copy that explicitly marks the HEL-156 blocker narrative as superseded
 
 ## Experiment ledger rules
 

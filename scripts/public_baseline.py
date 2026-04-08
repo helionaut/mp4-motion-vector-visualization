@@ -41,6 +41,26 @@ def ensure_parent(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
 
+def to_repo_relative_str(path: Path) -> str:
+    try:
+        return str(path.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)
+
+
+def build_report_title(manifest: dict[str, Any]) -> str:
+    return f"{manifest['run_id'].replace('-', ' ').title()} Report"
+
+
+def build_expected_command_surface(manifest: dict[str, Any], progress_artifact: Path) -> str:
+    manifest_path = Path(manifest["paths"]["manifest_path"])
+    return (
+        "python3 scripts/public_baseline.py run "
+        f"--manifest {to_repo_relative_str(manifest_path)} "
+        f"--progress-artifact {to_repo_relative_str(progress_artifact)}"
+    )
+
+
 def write_progress_artifact(
     progress_path: Path,
     *,
@@ -156,6 +176,7 @@ def build_libavcodec_extract_command(
     input_spec: dict[str, Any],
     output_path: Path,
 ) -> list[str]:
+    summary_output_path = extract_summary_sidecar_path(output_path)
     return [
         str(extractor_bin),
         "--input",
@@ -164,6 +185,8 @@ def build_libavcodec_extract_command(
         input_spec["name"],
         "--output",
         str(output_path),
+        "--summary-output",
+        str(summary_output_path),
     ]
 
 
@@ -183,6 +206,16 @@ def build_render_command(ffmpeg_bin: Path, input_spec: dict[str, Any], output_pa
         "1",
         str(output_path),
     ]
+
+
+def extract_summary_sidecar_path(output_path: Path) -> Path:
+    return output_path.with_name(f"{output_path.stem}.summary.json")
+
+
+def load_extract_summary(output_path: Path) -> dict[str, Any]:
+    summary_path = extract_summary_sidecar_path(output_path)
+    candidate_path = summary_path if summary_path.is_file() else output_path
+    return json.loads(candidate_path.read_text())
 
 
 def summarize_ffprobe_frames(ffprobe_doc: dict[str, Any]) -> dict[str, Any]:
@@ -423,6 +456,7 @@ def write_status_report(
     manifest: dict[str, Any],
     report_dir: Path,
     *,
+    progress_artifact: Path,
     status: str,
     blocked_by: str | None = None,
     notes: list[str] | None = None,
@@ -435,7 +469,7 @@ def write_status_report(
         "blocked_by": blocked_by,
         "missing_tools": missing_tools or [],
         "host_bootstrap_command": "scripts/bootstrap_host_libavcodec.sh --output build/host/libavcodec_mv_extractor",
-        "expected_command_surface": "scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-156.json",
+        "expected_command_surface": build_expected_command_surface(manifest, progress_artifact),
         "docker_command_surface": "not-used-in-hel-156-host-slice",
         "generated_at": utc_now(),
         "notes": notes or [],
@@ -446,7 +480,7 @@ def write_status_report(
     report_path.write_text(json.dumps(report, indent=2) + "\n")
     markdown_path = report_dir / "report.md"
     report_lines = [
-        "# Public Baseline Report",
+        f"# {build_report_title(manifest)}",
         "",
         f"- Run id: `{manifest['run_id']}`",
         f"- Status: {status}",
@@ -459,7 +493,7 @@ def write_status_report(
         "- Host bootstrap command: `scripts/bootstrap_host_libavcodec.sh --output build/host/libavcodec_mv_extractor`"
     )
     report_lines.append(
-        "- Host validation command: `scripts/prepare_public_inputs.sh && python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-156.json`"
+        f"- Run command: `{build_expected_command_surface(manifest, progress_artifact)}`"
     )
     if notes:
         report_lines.append("- Notes:")
@@ -518,6 +552,7 @@ def run_baseline(manifest: dict[str, Any], *, progress_artifact: Path) -> int:
         write_status_report(
             manifest,
             artifact_paths["report_dir"],
+            progress_artifact=progress_artifact,
             status="blocked",
             blocked_by="ffmpeg-bootstrap-failed",
             notes=[str(exc)],
@@ -544,6 +579,7 @@ def run_baseline(manifest: dict[str, Any], *, progress_artifact: Path) -> int:
         write_status_report(
             manifest,
             artifact_paths["report_dir"],
+            progress_artifact=progress_artifact,
             status="blocked",
             blocked_by="host-libavcodec-dev-surface-missing",
             notes=[
@@ -581,7 +617,7 @@ def run_baseline(manifest: dict[str, Any], *, progress_artifact: Path) -> int:
             artifacts=shared_artifacts,
         )
         run_command(extract_command)
-        summary = json.loads(extract_summary_path.read_text())
+        summary = load_extract_summary(extract_summary_path)
         summary["source_path"] = input_spec["raw_path"]
         summary["raw_sha256"] = input_spec.get("raw_sha256")
         summary["extractor_binary"] = str(extractor_bin)
@@ -643,10 +679,11 @@ def run_baseline(manifest: dict[str, Any], *, progress_artifact: Path) -> int:
         write_status_report(
             manifest,
             artifact_paths["report_dir"],
+            progress_artifact=progress_artifact,
             status="blocked",
             blocked_by=blocked_by,
             notes=[
-                "host libavcodec extraction completed for both public MP4 inputs",
+                "host libavcodec extraction completed for both manifest inputs",
                 "codecview render artifacts were written",
                 (
                     "motion-vector side-data is visible through libavcodec, but the runtime still emitted zero coordinate-bearing vectors"
@@ -678,9 +715,10 @@ def run_baseline(manifest: dict[str, Any], *, progress_artifact: Path) -> int:
     status_path = write_status_report(
         manifest,
         artifact_paths["report_dir"],
+        progress_artifact=progress_artifact,
         status="success",
         notes=[
-            "public baseline extraction completed from the prepared HEL-150 manifest via the host libavcodec extractor",
+            "baseline extraction completed from the prepared manifest via the host libavcodec extractor",
             f"ffmpeg bin: {ffmpeg_bin}",
             f"ffprobe bin: {ffprobe_bin}",
             f"extractor bin: {extractor_bin}",
@@ -704,12 +742,12 @@ def run_baseline(manifest: dict[str, Any], *, progress_artifact: Path) -> int:
     )
 
     report_lines = [
-        "# Public Baseline Report",
+        f"# {build_report_title(manifest)}",
         "",
         f"- Run id: `{manifest['run_id']}`",
         "- Status: success",
-        "- Proven path: prepared public MP4 manifest -> host libavcodec motion-vector extractor -> codecview renders -> SVG comparison summary",
-        f"- Input manifest: `{Path(paths['manifest_path']).name}`",
+        "- Proven path: prepared MP4 manifest -> host libavcodec motion-vector extractor -> codecview renders -> SVG comparison summary",
+        f"- Input manifest: `{to_repo_relative_str(Path(paths['manifest_path']))}`",
         "- Inputs:",
     ]
     for item in comparison_summary["inputs"]:

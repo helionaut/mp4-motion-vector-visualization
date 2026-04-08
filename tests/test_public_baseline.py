@@ -103,8 +103,60 @@ class PublicBaselineTests(unittest.TestCase):
                 "input-a",
                 "--output",
                 "/tmp/output.json",
+                "--summary-output",
+                "/tmp/output.summary.json",
             ],
         )
+
+    def test_extract_summary_sidecar_path(self) -> None:
+        summary_path = public_baseline.extract_summary_sidecar_path(Path("/tmp/output.json"))
+
+        self.assertEqual(summary_path, Path("/tmp/output.summary.json"))
+
+    def test_load_extract_summary_prefers_compact_sidecar(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_path = Path(tmp_dir) / "vectors.json"
+            output_path.write_text("{not valid json")
+            sidecar_path = public_baseline.extract_summary_sidecar_path(output_path)
+            sidecar_path.write_text(
+                json.dumps(
+                    {
+                        "frame_count": 12,
+                        "frames_with_vectors": 10,
+                        "frames_with_motion_side_data": 10,
+                        "total_vectors": 345,
+                        "mean_vector_magnitude": 1.25,
+                        "coordinate_vectors_available": True,
+                    }
+                )
+            )
+
+            summary = public_baseline.load_extract_summary(output_path)
+
+        self.assertEqual(summary["total_vectors"], 345)
+        self.assertTrue(summary["coordinate_vectors_available"])
+
+    def test_load_extract_summary_falls_back_to_full_output(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_path = Path(tmp_dir) / "vectors.json"
+            output_path.write_text(
+                json.dumps(
+                    {
+                        "frame_count": 4,
+                        "frames_with_vectors": 2,
+                        "frames_with_motion_side_data": 3,
+                        "total_vectors": 6,
+                        "mean_vector_magnitude": 2.0,
+                        "coordinate_vectors_available": True,
+                        "frames": [],
+                    }
+                )
+            )
+
+            summary = public_baseline.load_extract_summary(output_path)
+
+        self.assertEqual(summary["frame_count"], 4)
+        self.assertEqual(summary["total_vectors"], 6)
 
     def test_summarize_ffmpeg_showinfo_tracks_payload_bytes(self) -> None:
         log_text = """
@@ -164,7 +216,17 @@ class PublicBaselineTests(unittest.TestCase):
             status = json.loads(status_path.read_text())
             self.assertEqual(status["status"], "blocked")
             self.assertEqual(status["blocked_by"], "ffmpeg-bootstrap-failed")
+            self.assertEqual(
+                status["expected_command_surface"],
+                "python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-155.json",
+            )
             self.assertTrue(report_path.exists())
+
+    def test_build_report_title_uses_run_id(self) -> None:
+        self.assertEqual(
+            public_baseline.build_report_title({"run_id": "user-validation"}),
+            "User Validation Report",
+        )
 
     def test_print_plan_uses_prepared_manifest_inputs(self) -> None:
         manifest = {
