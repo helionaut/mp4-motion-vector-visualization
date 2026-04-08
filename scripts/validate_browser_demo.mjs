@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
+import net from "node:net";
 import path from "node:path";
 import process from "node:process";
 
@@ -9,8 +10,6 @@ const repoRoot = process.cwd();
 const browserPath =
   process.env.PLAYWRIGHT_CHROMIUM_PATH ||
   "/home/helionaut/.cache/ms-playwright/chromium-1217/chrome-linux64/chrome";
-const serverPort = Number(process.env.BROWSER_DEMO_PORT || "4173");
-const baseUrl = `http://127.0.0.1:${serverPort}/browser-demo/`;
 const screenshotDir = path.join(repoRoot, ".symphony", "screenshots");
 const fixtureA =
   process.env.BROWSER_DEMO_FILE_A ||
@@ -25,14 +24,39 @@ async function ensureFixtures() {
   await fs.mkdir(screenshotDir, { recursive: true });
 }
 
-function startServer() {
-  return spawn("python3", ["-m", "http.server", String(serverPort)], {
+async function chooseServerPort() {
+  if (process.env.BROWSER_DEMO_PORT) {
+    return Number(process.env.BROWSER_DEMO_PORT);
+  }
+
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.on("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const address = probe.address();
+      if (!address || typeof address === "string") {
+        probe.close(() => reject(new Error("Failed to resolve an ephemeral port.")));
+        return;
+      }
+      probe.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(address.port);
+      });
+    });
+  });
+}
+
+function startServer(serverPort) {
+  return spawn("python3", ["-m", "http.server", String(serverPort), "--bind", "127.0.0.1"], {
     cwd: repoRoot,
     stdio: "ignore"
   });
 }
 
-async function waitForServer() {
+async function waitForServer(baseUrl) {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     try {
       const response = await fetch(baseUrl);
@@ -96,11 +120,13 @@ async function runMobileCheck() {
   await browser.close();
 }
 
-const server = startServer();
+const serverPort = await chooseServerPort();
+const baseUrl = `http://127.0.0.1:${serverPort}/browser-demo/`;
+const server = startServer(serverPort);
 
 try {
   await ensureFixtures();
-  await waitForServer();
+  await waitForServer(baseUrl);
   await runDesktopCheck();
   await runMobileCheck();
   console.log(
