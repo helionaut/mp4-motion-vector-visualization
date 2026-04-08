@@ -1,0 +1,13 @@
+{
+  "name": "mp4-motion-vector-visualization",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "python3 -m http.server 4173",
+    "test": "node --test tests/browser-demo.test.js",
+    "validate:browser-demo": "node scripts/validate_browser_demo.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.59.1"
+  }
+}

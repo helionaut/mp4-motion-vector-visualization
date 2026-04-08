@@ -1,4 +1,6 @@
 .symphony/
+node_modules
+node_modules/
 __pycache__/
 *.pyc
 reports/out/*/vectors/*.ffprobe.json
