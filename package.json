@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "serve": "python3 -m http.server 4173 --directory browser-demo",
-    "test": "node --test tests/browser-demo.test.js",
+    "test": "node --test tests/*.test.js",
     "validate:browser-demo": "node scripts/validate_browser_demo.mjs"
   },
   "devDependencies": {
