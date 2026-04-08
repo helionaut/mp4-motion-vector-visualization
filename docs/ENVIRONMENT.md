@@ -168,6 +168,38 @@ scripts/bootstrap_host_libavcodec.sh --output build/host/libavcodec_mv_extractor
 python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json --progress-artifact .symphony/progress/HEL-156.json
 ```
 
+## HEL-157 superseding host proof
+
+HEL-157 reused the same host extractor family on a provisioned WSL machine where `pkg-config --exists libavformat libavcodec libavutil` succeeds and the committed bootstrap script can build `build/host/libavcodec_mv_extractor`.
+
+What changed relative to HEL-156:
+
+- the extractor now writes a compact `<vectors>.summary.json` sidecar next to the full vector JSON
+- `scripts/public_baseline.py` reads that sidecar instead of deserializing the full multi-GB vector artifact into Python
+- the staged private pair under `/home/helionaut/srv/research-cache/18afd661ce11/datasets/user/raw/user-validation/` remains fixed
+
+What this proves on the provisioned WSL host:
+
+- the HEL-156 environment blocker is no longer the live boundary on this machine
+- the host extractor builds and runs successfully here
+- the private validation lane completes end-to-end with truthful coordinate-vector evidence and comparison artifacts
+- the large vector artifacts are now survivable in practice because Python no longer attempts `json.loads()` on files that reached roughly `3.28 GB` each during the successful private rerun
+
+Key HEL-157 artifacts:
+
+- `.symphony/validation/HEL-157.json`
+- `reports/out/user-validation/vectors/input_a.json`
+- `reports/out/user-validation/vectors/input_a.summary.json`
+- `reports/out/user-validation/vectors/input_b.json`
+- `reports/out/user-validation/vectors/input_b.summary.json`
+- `reports/out/user-validation/comparison/summary.json`
+- `reports/out/user-validation/status.json`
+
+Interpretation:
+
+- preserve HEL-156 as audit history for the earlier missing-dev-surface host
+- use HEL-157 as the truthful current environment statement for this provisioned WSL machine
+
 ## Extractor follow-up reuse contract
 
 The next public extractor recovery slice must keep this environment contract fixed while changing only the extraction surface.

@@ -69,6 +69,7 @@ static void json_escape(FILE *stream, const char *value) {
 }
 
 static int write_output(
+    const char *summary_output_path,
     const char *output_path,
     const char *input_name,
     const char *input_path,
@@ -134,10 +135,39 @@ static int write_output(
 
     fprintf(stream, "  ]\n}\n");
     fclose(stream);
+    if (summary_output_path == NULL) {
+        return 0;
+    }
+
+    FILE *summary_stream = fopen(summary_output_path, "w");
+    if (summary_stream == NULL) {
+        fprintf(stderr, "failed to open summary output %s: %s\n", summary_output_path, strerror(errno));
+        return 1;
+    }
+
+    fprintf(summary_stream, "{\n");
+    fprintf(summary_stream, "  \"extractor_surface\": \"host libavcodec AV_FRAME_DATA_MOTION_VECTORS\",\n");
+    fprintf(summary_stream, "  \"input_name\": ");
+    json_escape(summary_stream, input_name);
+    fprintf(summary_stream, ",\n  \"source_path\": ");
+    json_escape(summary_stream, input_path);
+    fprintf(summary_stream, ",\n  \"frame_count\": %d,\n", frame_count);
+    fprintf(summary_stream, "  \"frames_with_vectors\": %d,\n", frames_with_vectors);
+    fprintf(summary_stream, "  \"frames_with_motion_side_data\": %d,\n", frames_with_motion_side_data);
+    fprintf(summary_stream, "  \"total_vectors\": %lld,\n", total_vectors);
+    fprintf(summary_stream, "  \"mean_vector_magnitude\": %.6f,\n", total_vectors > 0 ? total_magnitude / (double)total_vectors : 0.0);
+    fprintf(summary_stream, "  \"coordinate_vectors_available\": %s\n", total_vectors > 0 ? "true" : "false");
+    fprintf(summary_stream, "}\n");
+    fclose(summary_stream);
     return 0;
 }
 
-static int decode_to_json(const char *input_path, const char *input_name, const char *output_path) {
+static int decode_to_json(
+    const char *input_path,
+    const char *input_name,
+    const char *output_path,
+    const char *summary_output_path
+) {
     int result = 0;
     AVFormatContext *format_context = NULL;
     AVCodecContext *codec_context = NULL;
@@ -368,6 +398,7 @@ static int decode_to_json(const char *input_path, const char *input_name, const 
     }
 
     result = write_output(
+        summary_output_path,
         output_path,
         input_name,
         input_path,
@@ -392,6 +423,7 @@ int main(int argc, char **argv) {
     const char *input_path = NULL;
     const char *input_name = NULL;
     const char *output_path = NULL;
+    const char *summary_output_path = NULL;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--input") == 0 && i + 1 < argc) {
@@ -400,6 +432,8 @@ int main(int argc, char **argv) {
             input_name = argv[++i];
         } else if (strcmp(argv[i], "--output") == 0 && i + 1 < argc) {
             output_path = argv[++i];
+        } else if (strcmp(argv[i], "--summary-output") == 0 && i + 1 < argc) {
+            summary_output_path = argv[++i];
         } else {
             fprintf(stderr, "unknown or incomplete argument: %s\n", argv[i]);
             return 1;
@@ -412,5 +446,5 @@ int main(int argc, char **argv) {
     }
 
     av_log_set_level(AV_LOG_ERROR);
-    return decode_to_json(input_path, input_name, output_path);
+    return decode_to_json(input_path, input_name, output_path, summary_output_path);
 }
