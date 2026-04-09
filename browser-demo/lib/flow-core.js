@@ -49,6 +49,53 @@ export function computeLumaPlane(rgba, width, height) {
   return luma;
 }
 
+export function getContainedVideoRect({ containerWidth, containerHeight, videoWidth, videoHeight }) {
+  if (
+    !Number.isFinite(containerWidth) ||
+    !Number.isFinite(containerHeight) ||
+    containerWidth <= 0 ||
+    containerHeight <= 0
+  ) {
+    return { x: 0, y: 0, width: 0, height: 0 };
+  }
+
+  if (
+    !Number.isFinite(videoWidth) ||
+    !Number.isFinite(videoHeight) ||
+    videoWidth <= 0 ||
+    videoHeight <= 0
+  ) {
+    return { x: 0, y: 0, width: containerWidth, height: containerHeight };
+  }
+
+  const scale = Math.min(containerWidth / videoWidth, containerHeight / videoHeight);
+  const width = videoWidth * scale;
+  const height = videoHeight * scale;
+  return {
+    x: (containerWidth - width) / 2,
+    y: (containerHeight - height) / 2,
+    width,
+    height
+  };
+}
+
+export function projectMotionVector({
+  vector,
+  analysisWidth,
+  analysisHeight,
+  displayRect,
+  vectorScale = 2.2
+}) {
+  const scaleX = displayRect.width / analysisWidth;
+  const scaleY = displayRect.height / analysisHeight;
+  return {
+    fromX: displayRect.x + vector.x * scaleX,
+    fromY: displayRect.y + vector.y * scaleY,
+    toX: displayRect.x + (vector.x + vector.dx * vectorScale) * scaleX,
+    toY: displayRect.y + (vector.y + vector.dy * vectorScale) * scaleY
+  };
+}
+
 function blockDifference(frameA, frameB, width, blockX, blockY, sampleSize, dx, dy) {
   let score = 0;
   const startX = blockX + dx;

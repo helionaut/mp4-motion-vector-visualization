@@ -1,10 +1,18 @@
-import { FLOW_MODE, computeLumaPlane, describeSplitAttempt, formatFileMeta } from "./lib/flow-core.js";
+import {
+  FLOW_MODE,
+  computeLumaPlane,
+  describeSplitAttempt,
+  estimateMotionVectors,
+  formatFileMeta,
+  getContainedVideoRect,
+  projectMotionVector
+} from "./lib/flow-core.js";
 
 const state = {
   mode: FLOW_MODE,
   overlayVisible: true,
   syncEnabled: true,
-  sampleStride: 3,
+  sampleStride: 1,
   statusEntries: [],
   frameRequestId: 0
 };
@@ -51,24 +59,18 @@ class VideoAnalyzer {
     this.name = name;
     this.video = video;
     this.overlay = overlay;
-    this.worker = new Worker(new URL("./flow-worker.js", import.meta.url), { type: "module" });
     this.hiddenCanvas = document.createElement("canvas");
     this.hiddenContext = this.hiddenCanvas.getContext("2d", { willReadFrequently: true });
     this.overlayContext = overlay.getContext("2d");
     this.previousPlane = null;
-    this.pending = false;
     this.sampleCounter = 0;
     this.analysisWidth = 160;
     this.analysisHeight = 90;
     this.frameCallbackBound = this.onFrame.bind(this);
     this.latestVectors = [];
     this.metadata = {};
-
-    this.worker.onmessage = (event) => {
-      this.pending = false;
-      this.latestVectors = event.data.vectors;
-      this.renderOverlay();
-    };
+    this.currentFrameToken = 0;
+    this.lastRenderedFrameToken = 0;
 
     video.addEventListener("loadedmetadata", () => {
       this.metadata = {
@@ -93,8 +95,9 @@ class VideoAnalyzer {
   reset(clear = false) {
     this.previousPlane = null;
     this.latestVectors = [];
-    this.pending = false;
     this.sampleCounter = 0;
+    this.currentFrameToken = 0;
+    this.lastRenderedFrameToken = 0;
     if (clear) {
       this.overlayContext.clearRect(0, 0, this.overlay.width, this.overlay.height);
     }
@@ -120,18 +123,22 @@ class VideoAnalyzer {
     this.video.requestVideoFrameCallback(this.frameCallbackBound);
   }
 
-  onFrame() {
+  onFrame(_now, metadata = {}) {
     if (!this.video.paused && !this.video.ended) {
+      this.currentFrameToken = Number.isFinite(metadata.presentedFrames)
+        ? metadata.presentedFrames
+        : this.currentFrameToken + 1;
       this.sampleCounter += 1;
       if (this.sampleCounter % state.sampleStride === 0) {
-        this.captureFrame();
+        this.captureFrame(this.currentFrameToken);
       }
+      this.renderOverlay();
       this.video.requestVideoFrameCallback(this.frameCallbackBound);
     }
   }
 
-  captureFrame() {
-    if (this.pending || this.video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+  captureFrame(frameToken) {
+    if (this.video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
       return;
     }
 
@@ -144,22 +151,19 @@ class VideoAnalyzer {
       return;
     }
 
-    this.pending = true;
     const previousPlane = this.previousPlane;
     this.previousPlane = currentPlane;
-    this.worker.postMessage({
-      id: `${this.name}-${Date.now()}`,
-      payload: {
-        previousFrame: previousPlane,
-        currentFrame: currentPlane,
-        width: this.analysisWidth,
-        height: this.analysisHeight,
-        gridStep: 16,
-        sampleSize: 10,
-        searchRadius: 4,
-        minimumConfidence: 22
-      }
+    this.latestVectors = estimateMotionVectors({
+      previousFrame: previousPlane,
+      currentFrame: currentPlane,
+      width: this.analysisWidth,
+      height: this.analysisHeight,
+      gridStep: 16,
+      sampleSize: 10,
+      searchRadius: 4,
+      minimumConfidence: 22
     });
+    this.lastRenderedFrameToken = frameToken;
   }
 
   renderOverlay() {
@@ -168,17 +172,29 @@ class VideoAnalyzer {
       return;
     }
 
-    const scaleX = this.overlay.width / this.analysisWidth;
-    const scaleY = this.overlay.height / this.analysisHeight;
+    const displayRect = getContainedVideoRect({
+      containerWidth: this.overlay.width,
+      containerHeight: this.overlay.height,
+      videoWidth: this.metadata.width,
+      videoHeight: this.metadata.height
+    });
+    const vectors = this.lastRenderedFrameToken === this.currentFrameToken ? this.latestVectors : [];
+
+    this.overlayContext.save();
+    this.overlayContext.beginPath();
+    this.overlayContext.rect(displayRect.x, displayRect.y, displayRect.width, displayRect.height);
+    this.overlayContext.clip();
     this.overlayContext.strokeStyle = "#ffd166";
     this.overlayContext.fillStyle = "rgba(255, 209, 102, 0.28)";
     this.overlayContext.lineWidth = 1.4;
 
-    for (const vector of this.latestVectors) {
-      const fromX = vector.x * scaleX;
-      const fromY = vector.y * scaleY;
-      const toX = (vector.x + vector.dx * 2.2) * scaleX;
-      const toY = (vector.y + vector.dy * 2.2) * scaleY;
+    for (const vector of vectors) {
+      const { fromX, fromY, toX, toY } = projectMotionVector({
+        vector,
+        analysisWidth: this.analysisWidth,
+        analysisHeight: this.analysisHeight,
+        displayRect
+      });
 
       this.overlayContext.beginPath();
       this.overlayContext.moveTo(fromX, fromY);
@@ -189,6 +205,8 @@ class VideoAnalyzer {
       this.overlayContext.arc(fromX, fromY, 1.6, 0, Math.PI * 2);
       this.overlayContext.fill();
     }
+
+    this.overlayContext.restore();
   }
 }
 
@@ -290,6 +308,8 @@ elements.overlayToggle.addEventListener("change", () => {
 elements.syncToggle.addEventListener("change", () => {
   state.syncEnabled = elements.syncToggle.checked;
 });
+
+elements.sampleStride.value = String(state.sampleStride);
 
 elements.sampleStride.addEventListener("input", () => {
   state.sampleStride = Number(elements.sampleStride.value);
