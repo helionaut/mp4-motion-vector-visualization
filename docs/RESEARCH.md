@@ -276,6 +276,44 @@ This project should not branch into UI polish or speculative parser work until t
   - refreshed `reports/out/public-baseline/` evidence
   - updated docs/handoff copy that explicitly marks the HEL-156 blocker narrative as superseded
 
+## HEL-163 outcome
+
+### What shipped
+
+- `scripts/render_dense_flow.py` renders a dense optical-flow-style artifact directly from the host extractor's coordinate-vector JSON.
+- `scripts/public_baseline.py` now invokes that renderer per input so the baseline can emit both the older `codecview` still and a dense raw/overlay visualization slice.
+- The renderer writes a representative-frame `summary.json`, a raw dense map, and an overlay image with a magnitude scale plus a direction legend.
+
+### What is proven
+
+- On this WSL host, `scripts/bootstrap_host_libavcodec.sh --output build/host/libavcodec_mv_extractor` now succeeds, which supersedes the earlier local blocker that claimed FFmpeg development metadata was unavailable.
+- A real public sample clip now yields dense codec-grid evidence with reviewable artifacts under `reports/out/hel-163-dense-flow/bbb_480p_sample/`.
+- The dense view is truthful about codec limits: coverage is dense across the exposed block grid (`8x8` and `16x16` on the sample), not a fabricated per-pixel flow field.
+
+### What is still open
+
+- This slice proves artifact generation on a sample clip and wires the public baseline to produce dense-flow outputs, but it does not yet refresh the full committed `reports/out/public-baseline/` evidence set on the current host.
+- The browser demo remains the older decoded-frame optical-flow approximation; HEL-163 does not convert the browser UI into a codec-vector player.
+
+### Exact next issue
+
+- Recommended next issue title: `Public baseline refresh: regenerate full dense codec-flow artifacts from the prepared public pair`
+- Strategic context:
+  - the renderer and extractor surface are now working locally, so the next valuable step is to refresh the canonical public evidence instead of extending a separate demo surface
+- Tactical next step:
+  - rerun `scripts/public_baseline.py run --manifest manifests/public-baseline.json` on this host and publish the resulting dense-flow artifacts alongside refreshed comparison/report evidence
+- Changed variable:
+  - artifact refresh scope only, from sample-clip proof to the full prepared public pair
+- Hypothesis:
+  - the same working host extractor surface will regenerate the public baseline with dense codec-flow artifacts without reopening the earlier environment blocker
+- Success criterion:
+  - `reports/out/public-baseline/` contains refreshed dense raw/overlay outputs plus updated report/status evidence that matches the current host reality
+- Abort condition:
+  - if the full public rerun fails despite the working sample proof, stop and record the exact divergence between sample-clip success and full-baseline behavior
+- Outputs:
+  - refreshed full-run dense-flow artifacts
+  - updated public report/status/handoff evidence
+
 ## Experiment ledger rules
 
 Every research/build/run issue should leave behind a compact tactical + strategic handoff in this file or in a linked report:

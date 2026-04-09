@@ -208,6 +208,28 @@ def build_render_command(ffmpeg_bin: Path, input_spec: dict[str, Any], output_pa
     ]
 
 
+def build_dense_flow_command(
+    ffmpeg_bin: Path,
+    input_spec: dict[str, Any],
+    vectors_path: Path,
+    output_dir: Path,
+) -> list[str]:
+    return [
+        "python3",
+        "scripts/render_dense_flow.py",
+        "--vectors",
+        str(vectors_path),
+        "--video",
+        input_spec["raw_path"],
+        "--output-dir",
+        str(output_dir),
+        "--ffmpeg-bin",
+        str(ffmpeg_bin),
+        "--overlay-alpha",
+        "0.58",
+    ]
+
+
 def extract_summary_sidecar_path(output_path: Path) -> Path:
     return output_path.with_name(f"{output_path.stem}.summary.json")
 
@@ -513,6 +535,7 @@ def run_baseline(manifest: dict[str, Any], *, progress_artifact: Path) -> int:
     artifact_paths = {
         "vectors_dir": REPO_ROOT / paths["vectors_dir"],
         "renders_dir": REPO_ROOT / paths["renders_dir"],
+        "dense_flow_dir": REPO_ROOT / "reports" / "out" / manifest["run_id"] / "dense-flow",
         "comparison_dir": REPO_ROOT / paths["comparison_dir"],
         "report_dir": REPO_ROOT / "reports" / "out" / manifest["run_id"],
     }
@@ -525,6 +548,7 @@ def run_baseline(manifest: dict[str, Any], *, progress_artifact: Path) -> int:
         "report_dir": str(artifact_paths["report_dir"].relative_to(REPO_ROOT)),
         "vectors_dir": str(artifact_paths["vectors_dir"].relative_to(REPO_ROOT)),
         "renders_dir": str(artifact_paths["renders_dir"].relative_to(REPO_ROOT)),
+        "dense_flow_dir": str(artifact_paths["dense_flow_dir"].relative_to(REPO_ROOT)),
         "comparison_dir": str(artifact_paths["comparison_dir"].relative_to(REPO_ROOT)),
     }
     write_progress_artifact(
@@ -623,6 +647,31 @@ def run_baseline(manifest: dict[str, Any], *, progress_artifact: Path) -> int:
         summary["extractor_binary"] = str(extractor_bin)
         per_input_summary[input_spec["name"]] = summary
         processed_frames += summary["frame_count"]
+        write_progress_artifact(
+            progress_artifact,
+            status="running",
+            current_step=f"rendering dense codec flow for {input_spec['name']} ({index}/{len(manifest['inputs'])})",
+            completed=processed_frames,
+            total=estimated_total_frames,
+            metrics={
+                "input": input_spec["name"],
+                "frames_processed": processed_frames,
+                "frames_with_vectors": summary["frames_with_vectors"],
+                "total_vectors": summary["total_vectors"],
+            },
+            artifacts=shared_artifacts,
+        )
+
+        dense_flow_dir = artifact_paths["dense_flow_dir"] / input_spec["name"]
+        dense_flow_command = build_dense_flow_command(
+            ffmpeg_bin,
+            input_spec,
+            extract_summary_path,
+            dense_flow_dir,
+        )
+        run_command(dense_flow_command)
+        command_log.append({"step": "dense_flow", "input": input_spec["name"], "command": dense_flow_command})
+
         write_progress_artifact(
             progress_artifact,
             status="running",
@@ -788,6 +837,7 @@ def print_plan(manifest: dict[str, Any]) -> int:
         "artifacts": {
             "vectors_dir": manifest["paths"]["vectors_dir"],
             "renders_dir": manifest["paths"]["renders_dir"],
+            "dense_flow_dir": f"reports/out/{manifest['run_id']}/dense-flow",
             "comparison_dir": manifest["paths"]["comparison_dir"],
         },
     }

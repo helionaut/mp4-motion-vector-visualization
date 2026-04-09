@@ -1,0 +1,32 @@
+{
+  "vectors_path": "/home/helionaut/workspaces/HEL-163/.symphony/tmp/bbb_480p_sample.vectors.json",
+  "video_path": "/home/helionaut/workspaces/HEL-163/.symphony/tmp/bbb_480p_sample.mp4",
+  "frame_index": 49,
+  "timestamp_seconds": 2.083333,
+  "vector_count": 1957,
+  "average_magnitude": 6.478451,
+  "magnitude_reference": 9.848858,
+  "max_magnitude": 17.029386,
+  "dense_cell_count": 1957,
+  "block_widths": [
+    8,
+    16
+  ],
+  "block_heights": [
+    8,
+    16
+  ],
+  "overlay_alpha": 0.58,
+  "artifacts": {
+    "frame_png": "/home/helionaut/workspaces/HEL-163/reports/out/hel-163-dense-flow/bbb_480p_sample/frame.png",
+    "raw_svg": "/home/helionaut/workspaces/HEL-163/reports/out/hel-163-dense-flow/bbb_480p_sample/dense-flow-raw.svg",
+    "raw_png": "/home/helionaut/workspaces/HEL-163/reports/out/hel-163-dense-flow/bbb_480p_sample/dense-flow-raw.png",
+    "overlay_svg": "/home/helionaut/workspaces/HEL-163/reports/out/hel-163-dense-flow/bbb_480p_sample/dense-flow-overlay.svg",
+    "overlay_png": "/home/helionaut/workspaces/HEL-163/reports/out/hel-163-dense-flow/bbb_480p_sample/dense-flow-overlay.png"
+  },
+  "limitations": [
+    "The visualization is dense only across the codec motion-vector grid, not per pixel.",
+    "Block sizes and coverage depend on the encoded stream and decoder-exposed motion vectors.",
+    "Colors encode direction by hue and motion magnitude by saturation/value."
+  ]
+}

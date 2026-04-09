@@ -108,6 +108,32 @@ class PublicBaselineTests(unittest.TestCase):
             ],
         )
 
+    def test_build_dense_flow_command(self) -> None:
+        command = public_baseline.build_dense_flow_command(
+            Path("/tmp/ffmpeg"),
+            {"name": "input-a", "raw_path": "/tmp/input-a.mp4"},
+            Path("/tmp/vectors.json"),
+            Path("/tmp/dense-flow/input-a"),
+        )
+
+        self.assertEqual(
+            command,
+            [
+                "python3",
+                "scripts/render_dense_flow.py",
+                "--vectors",
+                "/tmp/vectors.json",
+                "--video",
+                "/tmp/input-a.mp4",
+                "--output-dir",
+                "/tmp/dense-flow/input-a",
+                "--ffmpeg-bin",
+                "/tmp/ffmpeg",
+                "--overlay-alpha",
+                "0.58",
+            ],
+        )
+
     def test_extract_summary_sidecar_path(self) -> None:
         summary_path = public_baseline.extract_summary_sidecar_path(Path("/tmp/output.json"))
 
