@@ -32,3 +32,12 @@ Symphony-managed project: MP4 Motion Vector Visualization
 - `scripts/bootstrap_host_libavcodec.sh --output build/host/libavcodec_mv_extractor`: build the HEL-156 host-side coordinate extractor when FFmpeg development packages are available on the machine
 - `python3 scripts/public_baseline.py plan --manifest manifests/public-baseline.json`: print the exact extraction/render plan for the prepared public baseline
 - `python3 scripts/public_baseline.py run --manifest manifests/public-baseline.json`: execute the public baseline against the prepared input manifest
+
+## Dense codec-flow artifact
+
+- `python3 scripts/render_dense_flow.py --vectors <vectors.json> --video <input.mp4> --output-dir <dir>`: render a dense optical-flow-style map from real codec motion vectors
+- output includes:
+  - `dense-flow-raw.{svg,png}`: the codec grid rendered without the source frame
+  - `dense-flow-overlay.{svg,png}`: the same field over the decoded frame with configurable overlay alpha
+  - `summary.json`: selected frame, magnitude scale, block-size coverage, and explicit limitations
+- honest limitation: density is limited to the motion-vector grid the codec exposes, typically block-sized cells such as `8x8` and `16x16`, not per-pixel optical flow
