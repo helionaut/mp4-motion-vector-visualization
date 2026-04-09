@@ -5,7 +5,9 @@ import {
   computeLumaPlane,
   describeSplitAttempt,
   estimateMotionVectors,
-  formatFileMeta
+  formatFileMeta,
+  getContainedVideoRect,
+  projectMotionVector
 } from "../browser-demo/lib/flow-core.js";
 
 test("describeSplitAttempt returns an explicit blocker without a file", () => {
@@ -61,4 +63,36 @@ test("estimateMotionVectors detects simple rightward motion", () => {
 
   assert.ok(vectors.length > 0);
   assert.ok(vectors.some((vector) => vector.dx >= 1));
+});
+
+test("getContainedVideoRect centers a 4:3 video inside a 16:9 container", () => {
+  const rect = getContainedVideoRect({
+    containerWidth: 1280,
+    containerHeight: 720,
+    videoWidth: 640,
+    videoHeight: 480
+  });
+
+  assert.deepEqual(rect, {
+    x: 160,
+    y: 0,
+    width: 960,
+    height: 720
+  });
+});
+
+test("projectMotionVector uses the contained video rect instead of the full canvas", () => {
+  const points = projectMotionVector({
+    vector: { x: 80, y: 45, dx: 4, dy: -2 },
+    analysisWidth: 160,
+    analysisHeight: 90,
+    displayRect: { x: 160, y: 0, width: 960, height: 720 }
+  });
+
+  assert.deepEqual(points, {
+    fromX: 640,
+    fromY: 360,
+    toX: 692.8,
+    toY: 324.8
+  });
 });
