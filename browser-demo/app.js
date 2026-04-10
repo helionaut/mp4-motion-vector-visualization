@@ -7,7 +7,8 @@ import {
   getContainedVideoRect,
   getMaximumMotionMagnitude,
   getMotionFieldCell,
-  getMotionFieldColor
+  getMotionFieldColor,
+  projectMotionVector
 } from "./lib/flow-core.js";
 
 const state = {
@@ -185,12 +186,15 @@ class VideoAnalyzer {
       videoHeight: this.metadata.height
     });
     const vectors = this.lastRenderedFrameToken === this.currentFrameToken ? this.latestVectors : [];
+    const maximumMagnitude = getMaximumMotionMagnitude(vectors);
 
     this.overlayContext.save();
     this.overlayContext.beginPath();
     this.overlayContext.rect(displayRect.x, displayRect.y, displayRect.width, displayRect.height);
     this.overlayContext.clip();
-    const maximumMagnitude = getMaximumMotionMagnitude(vectors);
+    this.overlayContext.fillStyle = "rgba(4, 10, 18, 0.2)";
+    this.overlayContext.fillRect(displayRect.x, displayRect.y, displayRect.width, displayRect.height);
+    this.overlayContext.lineWidth = 1;
 
     for (const vector of vectors) {
       const cell = getMotionFieldCell({
@@ -201,9 +205,32 @@ class VideoAnalyzer {
         gridStep: this.gridStep
       });
       const fill = getMotionFieldColor(vector, maximumMagnitude);
+      const { fromX, fromY, toX, toY } = projectMotionVector({
+        vector,
+        analysisWidth: this.analysisWidth,
+        analysisHeight: this.analysisHeight,
+        displayRect,
+        vectorScale: 1.25
+      });
+      const magnitudeRatio = Math.min(
+        1,
+        Math.hypot(vector.dx, vector.dy) / Math.max(1, maximumMagnitude)
+      );
+      const lineAlpha = Math.min(0.9, 0.35 + magnitudeRatio * 0.45);
 
       this.overlayContext.fillStyle = fill;
       this.overlayContext.fillRect(cell.x, cell.y, cell.width, cell.height);
+
+      this.overlayContext.strokeStyle = `rgba(245, 248, 255, ${lineAlpha.toFixed(2)})`;
+      this.overlayContext.beginPath();
+      this.overlayContext.moveTo(fromX, fromY);
+      this.overlayContext.lineTo(toX, toY);
+      this.overlayContext.stroke();
+
+      this.overlayContext.fillStyle = "rgba(245, 248, 255, 0.55)";
+      this.overlayContext.beginPath();
+      this.overlayContext.arc(fromX, fromY, 1.4, 0, Math.PI * 2);
+      this.overlayContext.fill();
     }
 
     this.overlayContext.restore();
