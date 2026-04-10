@@ -85,6 +85,7 @@ async function runDesktopCheck() {
   const badge = await page.textContent("#status-badge");
   const detail = await page.textContent("#status-detail");
   const mode = await page.textContent("#visualization-mode");
+  const vectorDetail = await page.textContent("#vector-detail");
   if (!badge?.match(/Analyzing|Ready/)) {
     throw new Error(`Unexpected desktop status badge: ${badge}`);
   }
@@ -94,9 +95,65 @@ async function runDesktopCheck() {
   if (mode?.trim() !== "optical-flow-approximation") {
     throw new Error(`Unexpected visualization mode: ${mode}`);
   }
+  if (!vectorDetail?.includes("Maximum")) {
+    throw new Error(`Unexpected vector detail label: ${vectorDetail}`);
+  }
+
+  const viewerBox = await page.locator(".video-stack").first().boundingBox();
+  if (!viewerBox || viewerBox.width < 1100 || viewerBox.height < 500) {
+    throw new Error(`Desktop viewer is not large enough: ${JSON.stringify(viewerBox)}`);
+  }
+
+  await page.click("#play-pause");
+  await page.waitForTimeout(400);
+  const pausedTimes = await page.evaluate(() => {
+    const videoA = document.querySelector("#video-a");
+    const videoB = document.querySelector("#video-b");
+    return {
+      a: videoA?.currentTime ?? 0,
+      b: videoB?.currentTime ?? 0,
+      pausedA: videoA?.paused ?? false,
+      pausedB: videoB?.paused ?? false
+    };
+  });
+  if (!pausedTimes.pausedA || !pausedTimes.pausedB) {
+    throw new Error(`Paired pause did not pause both streams: ${JSON.stringify(pausedTimes)}`);
+  }
+
+  await page.click("#frame-forward");
+  await page.waitForTimeout(400);
+  const steppedForwardTimes = await page.evaluate(() => {
+    const videoA = document.querySelector("#video-a");
+    const videoB = document.querySelector("#video-b");
+    return {
+      a: videoA?.currentTime ?? 0,
+      b: videoB?.currentTime ?? 0
+    };
+  });
+  if (steppedForwardTimes.a <= pausedTimes.a || steppedForwardTimes.b <= pausedTimes.b) {
+    throw new Error(
+      `Frame-forward control did not advance both streams: ${JSON.stringify({ pausedTimes, steppedForwardTimes })}`
+    );
+  }
+
+  await page.click("#frame-back");
+  await page.waitForTimeout(400);
+  const steppedBackwardTimes = await page.evaluate(() => {
+    const videoA = document.querySelector("#video-a");
+    const videoB = document.querySelector("#video-b");
+    return {
+      a: videoA?.currentTime ?? 0,
+      b: videoB?.currentTime ?? 0
+    };
+  });
+  if (steppedBackwardTimes.a >= steppedForwardTimes.a || steppedBackwardTimes.b >= steppedForwardTimes.b) {
+    throw new Error(
+      `Frame-back control did not rewind both streams: ${JSON.stringify({ steppedForwardTimes, steppedBackwardTimes })}`
+    );
+  }
 
   await page.screenshot({
-    path: path.join(screenshotDir, "HEL-159-desktop.png"),
+    path: path.join(screenshotDir, "HEL-168-desktop.png"),
     fullPage: true
   });
   await browser.close();
@@ -116,9 +173,13 @@ async function runMobileCheck() {
   if (cards !== 2) {
     throw new Error(`Expected 2 viewer cards on mobile, found ${cards}`);
   }
+  const playbackButtons = await page.locator(".playback-strip button").count();
+  if (playbackButtons !== 3) {
+    throw new Error(`Expected 3 playback buttons on mobile, found ${playbackButtons}`);
+  }
 
   await page.screenshot({
-    path: path.join(screenshotDir, "HEL-159-mobile.png"),
+    path: path.join(screenshotDir, "HEL-168-mobile.png"),
     fullPage: true
   });
   await browser.close();
@@ -139,8 +200,8 @@ try {
         status: "ok",
         baseUrl,
         screenshots: [
-          ".symphony/screenshots/HEL-159-desktop.png",
-          ".symphony/screenshots/HEL-159-mobile.png"
+          ".symphony/screenshots/HEL-168-desktop.png",
+          ".symphony/screenshots/HEL-168-mobile.png"
         ]
       },
       null,

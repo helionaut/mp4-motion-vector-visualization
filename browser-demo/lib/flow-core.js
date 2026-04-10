@@ -1,4 +1,14 @@
 export const FLOW_MODE = "optical-flow-approximation";
+export const DEFAULT_FRAME_RATE = 30;
+export const DENSE_FLOW_ANALYSIS = Object.freeze({
+  analysisWidth: 320,
+  analysisHeight: 180,
+  gridStep: 8,
+  sampleSize: 6,
+  searchRadius: 4,
+  minimumConfidence: 14,
+  vectorScale: 1.1
+});
 
 export function describeSplitAttempt(file) {
   if (!file) {
@@ -77,6 +87,25 @@ export function getContainedVideoRect({ containerWidth, containerHeight, videoWi
     width,
     height
   };
+}
+
+export function getFrameStepDeltaSeconds(frameRate = DEFAULT_FRAME_RATE) {
+  const safeFrameRate = Number.isFinite(frameRate) && frameRate > 0 ? frameRate : DEFAULT_FRAME_RATE;
+  return 1 / safeFrameRate;
+}
+
+export function getSteppedTime({
+  currentTime = 0,
+  duration = Number.POSITIVE_INFINITY,
+  direction = 1,
+  frameRate = DEFAULT_FRAME_RATE
+}) {
+  const delta = getFrameStepDeltaSeconds(frameRate) * (direction < 0 ? -1 : 1);
+  const safeCurrentTime = Number.isFinite(currentTime) ? currentTime : 0;
+  const safeDuration =
+    Number.isFinite(duration) && duration > 0 ? Math.max(0, duration - Number.EPSILON) : Number.POSITIVE_INFINITY;
+
+  return Math.min(safeDuration, Math.max(0, safeCurrentTime + delta));
 }
 
 export function projectMotionVector({

@@ -60,6 +60,10 @@
             Visualization mode:
             <strong id="visualization-mode">optical-flow-approximation</strong>
           </p>
+          <p class="mode-pill">
+            Vector map detail:
+            <strong id="vector-detail">Maximum</strong>
+          </p>
         </div>
         <div class="control-grid">
           <label>
@@ -74,6 +78,11 @@
             Sample stride
             <input id="sample-stride" type="range" min="1" max="6" step="1" value="1" />
           </label>
+        </div>
+        <div class="playback-strip" aria-label="Frame-by-frame playback">
+          <button id="frame-back" type="button">Previous frame</button>
+          <button id="play-pause" type="button">Play pair</button>
+          <button id="frame-forward" type="button">Next frame</button>
         </div>
       </section>
 
