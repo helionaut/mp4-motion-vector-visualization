@@ -5,7 +5,9 @@ import {
   estimateMotionVectors,
   formatFileMeta,
   getContainedVideoRect,
-  projectMotionVector
+  getMaximumMotionMagnitude,
+  getMotionFieldCell,
+  getMotionFieldColor
 } from "./lib/flow-core.js";
 
 const state = {
@@ -66,6 +68,10 @@ class VideoAnalyzer {
     this.sampleCounter = 0;
     this.analysisWidth = 160;
     this.analysisHeight = 90;
+    this.gridStep = 16;
+    this.sampleSize = 10;
+    this.searchRadius = 4;
+    this.minimumConfidence = 22;
     this.frameCallbackBound = this.onFrame.bind(this);
     this.latestVectors = [];
     this.metadata = {};
@@ -158,10 +164,10 @@ class VideoAnalyzer {
       currentFrame: currentPlane,
       width: this.analysisWidth,
       height: this.analysisHeight,
-      gridStep: 16,
-      sampleSize: 10,
-      searchRadius: 4,
-      minimumConfidence: 22
+      gridStep: this.gridStep,
+      sampleSize: this.sampleSize,
+      searchRadius: this.searchRadius,
+      minimumConfidence: this.minimumConfidence
     });
     this.lastRenderedFrameToken = frameToken;
   }
@@ -184,26 +190,20 @@ class VideoAnalyzer {
     this.overlayContext.beginPath();
     this.overlayContext.rect(displayRect.x, displayRect.y, displayRect.width, displayRect.height);
     this.overlayContext.clip();
-    this.overlayContext.strokeStyle = "#ffd166";
-    this.overlayContext.fillStyle = "rgba(255, 209, 102, 0.28)";
-    this.overlayContext.lineWidth = 1.4;
+    const maximumMagnitude = getMaximumMotionMagnitude(vectors);
 
     for (const vector of vectors) {
-      const { fromX, fromY, toX, toY } = projectMotionVector({
+      const cell = getMotionFieldCell({
         vector,
         analysisWidth: this.analysisWidth,
         analysisHeight: this.analysisHeight,
-        displayRect
+        displayRect,
+        gridStep: this.gridStep
       });
+      const fill = getMotionFieldColor(vector, maximumMagnitude);
 
-      this.overlayContext.beginPath();
-      this.overlayContext.moveTo(fromX, fromY);
-      this.overlayContext.lineTo(toX, toY);
-      this.overlayContext.stroke();
-
-      this.overlayContext.beginPath();
-      this.overlayContext.arc(fromX, fromY, 1.6, 0, Math.PI * 2);
-      this.overlayContext.fill();
+      this.overlayContext.fillStyle = fill;
+      this.overlayContext.fillRect(cell.x, cell.y, cell.width, cell.height);
     }
 
     this.overlayContext.restore();

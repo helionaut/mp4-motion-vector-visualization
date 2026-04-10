@@ -7,6 +7,9 @@ import {
   estimateMotionVectors,
   formatFileMeta,
   getContainedVideoRect,
+  getMaximumMotionMagnitude,
+  getMotionFieldCell,
+  getMotionFieldColor,
   projectMotionVector
 } from "../browser-demo/lib/flow-core.js";
 
@@ -95,4 +98,36 @@ test("projectMotionVector uses the contained video rect instead of the full canv
     toX: 692.8,
     toY: 324.8
   });
+});
+
+test("getMotionFieldCell projects a flow cell into the displayed video area", () => {
+  const cell = getMotionFieldCell({
+    vector: { x: 80, y: 45, dx: 4, dy: -2 },
+    analysisWidth: 160,
+    analysisHeight: 90,
+    displayRect: { x: 160, y: 0, width: 960, height: 720 },
+    gridStep: 16
+  });
+
+  assert.deepEqual(cell, {
+    x: 592,
+    y: 296,
+    width: 96,
+    height: 128
+  });
+});
+
+test("getMaximumMotionMagnitude returns the strongest vector length", () => {
+  const magnitude = getMaximumMotionMagnitude([
+    { dx: 1, dy: 2 },
+    { dx: 3, dy: 4 },
+    { dx: -2, dy: 1 }
+  ]);
+
+  assert.equal(magnitude, 5);
+});
+
+test("getMotionFieldColor encodes vector direction and magnitude into hsla", () => {
+  const color = getMotionFieldColor({ dx: 3, dy: 4 }, 5);
+  assert.match(color, /^hsla\(53\.1 72% 62\.0% \/ 0\.760\)$/);
 });
