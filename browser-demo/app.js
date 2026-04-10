@@ -4,11 +4,14 @@ import {
   describeSplitAttempt,
   estimateMotionVectors,
   formatFileMeta,
+  getDenseFlowSampling,
+  getFrameStepSeconds,
   getContainedVideoRect,
   getMaximumMotionMagnitude,
   getMotionFieldCell,
   getMotionFieldColor,
-  projectMotionVector
+  projectMotionVector,
+  stepPlaybackTime
 } from "./lib/flow-core.js";
 
 const state = {
@@ -17,7 +20,7 @@ const state = {
   syncEnabled: true,
   sampleStride: 1,
   statusEntries: [],
-  frameRequestId: 0
+  activeViewer: "a"
 };
 
 const elements = {
@@ -28,6 +31,10 @@ const elements = {
   pairB: document.querySelector("#pair-b"),
   loadPair: document.querySelector("#load-pair"),
   mode: document.querySelector("#visualization-mode"),
+  playPause: document.querySelector("#play-pause"),
+  stepBackward: document.querySelector("#step-backward"),
+  stepForward: document.querySelector("#step-forward"),
+  playbackDetail: document.querySelector("#playback-detail"),
   overlayToggle: document.querySelector("#overlay-toggle"),
   syncToggle: document.querySelector("#sync-toggle"),
   sampleStride: document.querySelector("#sample-stride"),
@@ -57,6 +64,157 @@ function pushStatus(badge, detail) {
   }
 }
 
+function getLoadedVideos() {
+  return [elements.videoA, elements.videoB].filter((video) => video.currentSrc);
+}
+
+function getControlTargets() {
+  if (state.syncEnabled) {
+    return getLoadedVideos();
+  }
+
+  const activeVideo = state.activeViewer === "b" ? elements.videoB : elements.videoA;
+  return activeVideo.currentSrc ? [activeVideo] : [];
+}
+
+function describePlaybackTarget() {
+  return state.syncEnabled ? "both streams" : `stream ${state.activeViewer.toUpperCase()}`;
+}
+
+function setPlaybackButtonLabel() {
+  const targets = getLoadedVideos();
+  const shouldPause = targets.some((video) => !video.paused && !video.ended);
+  elements.playPause.textContent = shouldPause ? "Pause" : "Play both";
+}
+
+function updatePlaybackDetail() {
+  const analyzersForDetail = state.syncEnabled
+    ? Object.values(analyzers).filter((analyzer) => analyzer.video.currentSrc)
+    : [analyzers[state.activeViewer]].filter((analyzer) => analyzer.video.currentSrc);
+  const measuredSteps = analyzersForDetail
+    .map((analyzer) => analyzer.estimatedFrameStepSeconds)
+    .filter((value) => Number.isFinite(value));
+  const averageStep =
+    measuredSteps.length > 0
+      ? measuredSteps.reduce((sum, value) => sum + value, 0) / measuredSteps.length
+      : getFrameStepSeconds();
+  const roundedMs = Math.round(averageStep * 1000 * 10) / 10;
+  const targetLabel = state.syncEnabled ? "both streams" : `stream ${state.activeViewer.toUpperCase()}`;
+  elements.playbackDetail.textContent = `Frame step for ${targetLabel}: about ${roundedMs} ms.`;
+}
+
+async function seekVideo(video, nextTime) {
+  if (!video.currentSrc) {
+    return;
+  }
+
+  const clampedTime = Math.max(0, nextTime);
+  if (Math.abs(video.currentTime - clampedTime) < 0.0005) {
+    return;
+  }
+
+  await new Promise((resolve) => {
+    let resolved = false;
+    const finish = () => {
+      if (resolved) {
+        return;
+      }
+      resolved = true;
+      resolve();
+    };
+    const timeoutId = window.setTimeout(finish, 150);
+    video.addEventListener(
+      "seeked",
+      () => {
+        window.clearTimeout(timeoutId);
+        finish();
+      },
+      { once: true }
+    );
+    video.currentTime = clampedTime;
+  });
+}
+
+async function stepTargets(frameDelta) {
+  const targets = getControlTargets();
+  if (targets.length === 0) {
+    pushStatus("Missing files", "Load one or both streams before stepping frame-by-frame.");
+    return;
+  }
+
+  for (const video of targets) {
+    video.pause();
+  }
+
+  await Promise.all(
+    targets.map((video) => {
+      const analyzer = video === elements.videoB ? analyzers.b : analyzers.a;
+      const frameStepSeconds = getFrameStepSeconds(analyzer.estimatedFrameStepSeconds);
+      return seekVideo(
+        video,
+        stepPlaybackTime({
+          currentTime: video.currentTime,
+          duration: video.duration,
+          frameStepSeconds,
+          frameDelta
+        })
+      );
+    })
+  );
+
+  setPlaybackButtonLabel();
+  updatePlaybackDetail();
+  pushStatus(
+    "Frame step",
+    `${frameDelta > 0 ? "Advanced" : "Moved back"} one frame on ${describePlaybackTarget()}.`
+  );
+}
+
+async function togglePlayback() {
+  const targets = getControlTargets();
+  if (targets.length === 0) {
+    pushStatus("Missing files", "Load one or both streams before using playback controls.");
+    return;
+  }
+
+  const shouldPause = targets.some((video) => !video.paused && !video.ended);
+  if (shouldPause) {
+    for (const video of targets) {
+      video.pause();
+    }
+    setPlaybackButtonLabel();
+    pushStatus("Paused", `Paused ${describePlaybackTarget()}.`);
+    return;
+  }
+
+  if (state.syncEnabled && targets.length > 1) {
+    const referenceTime = targets[0].currentTime;
+    for (const video of targets.slice(1)) {
+      video.currentTime = referenceTime;
+    }
+  }
+
+  await Promise.all(
+    targets.map((video) =>
+      video.play().catch(() => {
+        pushStatus("Ready", "Playback is loaded. Press play in the browser if autoplay is blocked.");
+      })
+    )
+  );
+  setPlaybackButtonLabel();
+  updatePlaybackDetail();
+}
+
+function updateViewerMeta(metaElement, analyzer) {
+  const base = formatFileMeta(analyzer.file, analyzer.metadata);
+  if (!analyzer.file) {
+    metaElement.textContent = base;
+    return;
+  }
+
+  metaElement.textContent = `${base} • analysis ${analyzer.analysisWidth}x${analyzer.analysisHeight} • grid ${analyzer.gridStep}px`;
+}
+
 class VideoAnalyzer {
   constructor({ name, video, overlay }) {
     this.name = name;
@@ -67,17 +225,20 @@ class VideoAnalyzer {
     this.overlayContext = overlay.getContext("2d");
     this.previousPlane = null;
     this.sampleCounter = 0;
-    this.analysisWidth = 160;
-    this.analysisHeight = 90;
-    this.gridStep = 16;
-    this.sampleSize = 10;
+    this.analysisWidth = 480;
+    this.analysisHeight = 270;
+    this.gridStep = 6;
+    this.sampleSize = 6;
     this.searchRadius = 4;
-    this.minimumConfidence = 22;
+    this.minimumConfidence = 14;
     this.frameCallbackBound = this.onFrame.bind(this);
     this.latestVectors = [];
     this.metadata = {};
     this.currentFrameToken = 0;
     this.lastRenderedFrameToken = 0;
+    this.lastMediaTime = null;
+    this.lastPresentedFrames = null;
+    this.estimatedFrameStepSeconds = null;
 
     video.addEventListener("loadedmetadata", () => {
       this.metadata = {
@@ -85,12 +246,31 @@ class VideoAnalyzer {
         height: video.videoHeight,
         duration: video.duration
       };
+      const sampling = getDenseFlowSampling({
+        videoWidth: video.videoWidth,
+        videoHeight: video.videoHeight
+      });
+      this.analysisWidth = sampling.analysisWidth;
+      this.analysisHeight = sampling.analysisHeight;
+      this.gridStep = sampling.gridStep;
+      this.sampleSize = sampling.sampleSize;
+      this.searchRadius = sampling.searchRadius;
+      this.minimumConfidence = sampling.minimumConfidence;
       this.resizeCanvases();
       this.renderOverlay();
+      updateViewerMeta(this.name === "a" ? elements.metaA : elements.metaB, this);
+      updatePlaybackDetail();
     });
     video.addEventListener("play", () => this.schedule());
     video.addEventListener("seeked", () => this.reset());
     video.addEventListener("emptied", () => this.reset(true));
+    video.addEventListener("play", () => setPlaybackButtonLabel());
+    video.addEventListener("pause", () => setPlaybackButtonLabel());
+    video.addEventListener("ended", () => setPlaybackButtonLabel());
+    video.addEventListener("pointerdown", () => {
+      state.activeViewer = this.name;
+      updatePlaybackDetail();
+    });
     window.addEventListener("resize", () => this.resizeCanvases());
   }
 
@@ -105,6 +285,9 @@ class VideoAnalyzer {
     this.sampleCounter = 0;
     this.currentFrameToken = 0;
     this.lastRenderedFrameToken = 0;
+    this.lastMediaTime = null;
+    this.lastPresentedFrames = null;
+    this.estimatedFrameStepSeconds = null;
     if (clear) {
       this.overlayContext.clearRect(0, 0, this.overlay.width, this.overlay.height);
     }
@@ -132,6 +315,25 @@ class VideoAnalyzer {
 
   onFrame(_now, metadata = {}) {
     if (!this.video.paused && !this.video.ended) {
+      if (
+        Number.isFinite(metadata.mediaTime) &&
+        Number.isFinite(metadata.presentedFrames) &&
+        Number.isFinite(this.lastMediaTime) &&
+        Number.isFinite(this.lastPresentedFrames)
+      ) {
+        const frameDelta = metadata.presentedFrames - this.lastPresentedFrames;
+        const timeDelta = metadata.mediaTime - this.lastMediaTime;
+        if (frameDelta > 0 && timeDelta > 0) {
+          const nextEstimate = timeDelta / frameDelta;
+          this.estimatedFrameStepSeconds = Number.isFinite(this.estimatedFrameStepSeconds)
+            ? this.estimatedFrameStepSeconds * 0.7 + nextEstimate * 0.3
+            : nextEstimate;
+        }
+      }
+      this.lastMediaTime = Number.isFinite(metadata.mediaTime) ? metadata.mediaTime : this.lastMediaTime;
+      this.lastPresentedFrames = Number.isFinite(metadata.presentedFrames)
+        ? metadata.presentedFrames
+        : this.lastPresentedFrames;
       this.currentFrameToken = Number.isFinite(metadata.presentedFrames)
         ? metadata.presentedFrames
         : this.currentFrameToken + 1;
@@ -140,6 +342,7 @@ class VideoAnalyzer {
         this.captureFrame(this.currentFrameToken);
       }
       this.renderOverlay();
+      updatePlaybackDetail();
       this.video.requestVideoFrameCallback(this.frameCallbackBound);
     }
   }
@@ -258,12 +461,14 @@ async function loadVideoFile(video, analyzer, file, metaElement) {
   await video.play().catch(() => {
     pushStatus("Ready", `${file.name} loaded. Press play if autoplay is blocked.`);
   });
-  metaElement.textContent = formatFileMeta(file, analyzer.metadata);
+  updateViewerMeta(metaElement, analyzer);
+  setPlaybackButtonLabel();
+  updatePlaybackDetail();
 }
 
 async function refreshMetadata() {
-  elements.metaA.textContent = formatFileMeta(analyzers.a.file, analyzers.a.metadata);
-  elements.metaB.textContent = formatFileMeta(analyzers.b.file, analyzers.b.metadata);
+  updateViewerMeta(elements.metaA, analyzers.a);
+  updateViewerMeta(elements.metaB, analyzers.b);
 }
 
 async function loadPair() {
@@ -303,12 +508,16 @@ function syncPlayback(source, target) {
 
 elements.videoA.addEventListener("timeupdate", () => syncPlayback(elements.videoA, elements.videoB));
 elements.videoB.addEventListener("timeupdate", () => syncPlayback(elements.videoB, elements.videoA));
+elements.videoA.addEventListener("timeupdate", () => updatePlaybackDetail());
+elements.videoB.addEventListener("timeupdate", () => updatePlaybackDetail());
 elements.videoA.addEventListener("play", () => {
+  state.activeViewer = "a";
   if (state.syncEnabled && elements.videoB.src && elements.videoB.paused) {
     elements.videoB.play().catch(() => {});
   }
 });
 elements.videoB.addEventListener("play", () => {
+  state.activeViewer = "b";
   if (state.syncEnabled && elements.videoA.src && elements.videoA.paused) {
     elements.videoA.play().catch(() => {});
   }
@@ -326,6 +535,22 @@ elements.loadPair.addEventListener("click", () => {
   });
 });
 
+elements.playPause.addEventListener("click", () => {
+  togglePlayback().catch((error) => {
+    pushStatus("Error", `Could not change playback state: ${error.message}`);
+  });
+});
+elements.stepBackward.addEventListener("click", () => {
+  stepTargets(-1).catch((error) => {
+    pushStatus("Error", `Could not move to the previous frame: ${error.message}`);
+  });
+});
+elements.stepForward.addEventListener("click", () => {
+  stepTargets(1).catch((error) => {
+    pushStatus("Error", `Could not move to the next frame: ${error.message}`);
+  });
+});
+
 elements.overlayToggle.addEventListener("change", () => {
   state.overlayVisible = elements.overlayToggle.checked;
   analyzers.a.renderOverlay();
@@ -334,6 +559,7 @@ elements.overlayToggle.addEventListener("change", () => {
 
 elements.syncToggle.addEventListener("change", () => {
   state.syncEnabled = elements.syncToggle.checked;
+  updatePlaybackDetail();
 });
 
 elements.sampleStride.value = String(state.sampleStride);
@@ -347,3 +573,5 @@ pushStatus(
   "Idle",
   "Waiting for media. For this MVP, use the pair-upload fallback and treat the overlay as optical-flow approximation."
 );
+setPlaybackButtonLabel();
+updatePlaybackDetail();

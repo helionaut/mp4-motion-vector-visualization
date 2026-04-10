@@ -62,6 +62,17 @@
           </p>
         </div>
         <div class="control-grid">
+          <div class="playback-cluster">
+            <span class="playback-label">Frame playback</span>
+            <div class="playback-buttons">
+              <button id="step-backward" type="button">Previous frame</button>
+              <button id="play-pause" type="button">Play both</button>
+              <button id="step-forward" type="button">Next frame</button>
+            </div>
+            <p id="playback-detail" class="inline-status">
+              Frame stepping uses the measured browser frame interval when available.
+            </p>
+          </div>
           <label>
             <input id="overlay-toggle" type="checkbox" checked />
             Show motion overlay

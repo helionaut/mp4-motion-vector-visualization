@@ -37,6 +37,28 @@ export function formatFileMeta(file, metadata = {}) {
   return parts.join(" • ");
 }
 
+export function getDenseFlowSampling({ videoWidth, videoHeight } = {}) {
+  const fallbackWidth = 16;
+  const fallbackHeight = 9;
+  const safeWidth = Number.isFinite(videoWidth) && videoWidth > 0 ? videoWidth : fallbackWidth;
+  const safeHeight = Number.isFinite(videoHeight) && videoHeight > 0 ? videoHeight : fallbackHeight;
+  const longestSideCap = 480;
+  const scale = Math.min(1, longestSideCap / Math.max(safeWidth, safeHeight));
+  const analysisWidth = Math.max(192, Math.round((safeWidth * scale) / 2) * 2);
+  const analysisHeight = Math.max(108, Math.round((safeHeight * scale) / 2) * 2);
+  const gridStep = Math.max(4, Math.min(8, Math.round(Math.min(analysisWidth, analysisHeight) / 45)));
+  const sampleSize = Math.max(4, gridStep);
+
+  return {
+    analysisWidth,
+    analysisHeight,
+    gridStep,
+    sampleSize,
+    searchRadius: 4,
+    minimumConfidence: 14
+  };
+}
+
 export function computeLumaPlane(rgba, width, height) {
   const luma = new Uint8Array(width * height);
   for (let rgbaIndex = 0, pixelIndex = 0; pixelIndex < luma.length; rgbaIndex += 4, pixelIndex += 1) {
@@ -133,6 +155,28 @@ export function getMaximumMotionMagnitude(vectors) {
   return vectors.reduce((maximum, vector) => {
     return Math.max(maximum, Math.hypot(vector.dx, vector.dy));
   }, 0);
+}
+
+export function getFrameStepSeconds(measuredFrameStep, fallbackFrameRate = 30) {
+  if (Number.isFinite(measuredFrameStep) && measuredFrameStep > 0 && measuredFrameStep < 1) {
+    return measuredFrameStep;
+  }
+
+  const safeFallbackRate =
+    Number.isFinite(fallbackFrameRate) && fallbackFrameRate > 0 ? fallbackFrameRate : 30;
+  return 1 / safeFallbackRate;
+}
+
+export function stepPlaybackTime({
+  currentTime,
+  duration,
+  frameStepSeconds,
+  frameDelta
+}) {
+  const nextTime = currentTime + frameStepSeconds * frameDelta;
+  const cappedDuration =
+    Number.isFinite(duration) && duration > 0 ? Math.max(0, duration - frameStepSeconds / 2) : Number.POSITIVE_INFINITY;
+  return Math.max(0, Math.min(nextTime, cappedDuration));
 }
 
 function blockDifference(frameA, frameB, width, blockX, blockY, sampleSize, dx, dy) {

@@ -85,6 +85,11 @@ async function runDesktopCheck() {
   const badge = await page.textContent("#status-badge");
   const detail = await page.textContent("#status-detail");
   const mode = await page.textContent("#visualization-mode");
+  const playbackDetail = await page.textContent("#playback-detail");
+  const metaA = await page.textContent("#meta-a");
+  const videoWidth = await page.locator(".video-stack").first().evaluate((node) => {
+    return Math.round(node.getBoundingClientRect().width);
+  });
   if (!badge?.match(/Analyzing|Ready/)) {
     throw new Error(`Unexpected desktop status badge: ${badge}`);
   }
@@ -94,9 +99,18 @@ async function runDesktopCheck() {
   if (mode?.trim() !== "optical-flow-approximation") {
     throw new Error(`Unexpected visualization mode: ${mode}`);
   }
+  if (!playbackDetail?.includes("Frame step")) {
+    throw new Error(`Missing playback detail: ${playbackDetail}`);
+  }
+  if (!metaA?.includes("analysis") || !metaA?.includes("grid")) {
+    throw new Error(`Missing dense-analysis metadata: ${metaA}`);
+  }
+  if (videoWidth < 1000) {
+    throw new Error(`Expected enlarged desktop viewer width, found ${videoWidth}px`);
+  }
 
   await page.screenshot({
-    path: path.join(screenshotDir, "HEL-159-desktop.png"),
+    path: path.join(screenshotDir, "HEL-167-desktop.png"),
     fullPage: true
   });
   await browser.close();
@@ -116,9 +130,13 @@ async function runMobileCheck() {
   if (cards !== 2) {
     throw new Error(`Expected 2 viewer cards on mobile, found ${cards}`);
   }
+  const playbackButtons = await page.locator(".playback-buttons button").count();
+  if (playbackButtons !== 3) {
+    throw new Error(`Expected 3 playback buttons on mobile, found ${playbackButtons}`);
+  }
 
   await page.screenshot({
-    path: path.join(screenshotDir, "HEL-159-mobile.png"),
+    path: path.join(screenshotDir, "HEL-167-mobile.png"),
     fullPage: true
   });
   await browser.close();
@@ -139,8 +157,8 @@ try {
         status: "ok",
         baseUrl,
         screenshots: [
-          ".symphony/screenshots/HEL-159-desktop.png",
-          ".symphony/screenshots/HEL-159-mobile.png"
+          ".symphony/screenshots/HEL-167-desktop.png",
+          ".symphony/screenshots/HEL-167-mobile.png"
         ]
       },
       null,

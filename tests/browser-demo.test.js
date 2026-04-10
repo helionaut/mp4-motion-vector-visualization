@@ -6,11 +6,14 @@ import {
   describeSplitAttempt,
   estimateMotionVectors,
   formatFileMeta,
+  getDenseFlowSampling,
+  getFrameStepSeconds,
   getContainedVideoRect,
   getMaximumMotionMagnitude,
   getMotionFieldCell,
   getMotionFieldColor,
-  projectMotionVector
+  projectMotionVector,
+  stepPlaybackTime
 } from "../browser-demo/lib/flow-core.js";
 
 test("describeSplitAttempt returns an explicit blocker without a file", () => {
@@ -38,6 +41,19 @@ test("computeLumaPlane converts RGBA bytes into grayscale pixels", () => {
     1
   );
   assert.deepEqual(Array.from(luma), [76, 150]);
+});
+
+test("getDenseFlowSampling preserves aspect ratio while increasing analysis density", () => {
+  const sampling = getDenseFlowSampling({ videoWidth: 1920, videoHeight: 1080 });
+
+  assert.deepEqual(sampling, {
+    analysisWidth: 480,
+    analysisHeight: 270,
+    gridStep: 6,
+    sampleSize: 6,
+    searchRadius: 4,
+    minimumConfidence: 14
+  });
 });
 
 test("estimateMotionVectors detects simple rightward motion", () => {
@@ -130,4 +146,39 @@ test("getMaximumMotionMagnitude returns the strongest vector length", () => {
 test("getMotionFieldColor encodes vector direction and magnitude into hsla", () => {
   const color = getMotionFieldColor({ dx: 3, dy: 4 }, 5);
   assert.match(color, /^hsla\(53\.1 72% 62\.0% \/ 0\.760\)$/);
+});
+
+test("getFrameStepSeconds falls back to 30 fps when no measured interval exists", () => {
+  assert.equal(getFrameStepSeconds(undefined), 1 / 30);
+  assert.equal(getFrameStepSeconds(1 / 24), 1 / 24);
+});
+
+test("stepPlaybackTime clamps frame stepping inside the playable duration", () => {
+  assert.equal(
+    stepPlaybackTime({
+      currentTime: 1,
+      duration: 2,
+      frameStepSeconds: 1 / 30,
+      frameDelta: 1
+    }),
+    1 + 1 / 30
+  );
+  assert.equal(
+    stepPlaybackTime({
+      currentTime: 0.01,
+      duration: 2,
+      frameStepSeconds: 1 / 30,
+      frameDelta: -1
+    }),
+    0
+  );
+  assert.equal(
+    stepPlaybackTime({
+      currentTime: 1.99,
+      duration: 2,
+      frameStepSeconds: 1 / 30,
+      frameDelta: 1
+    }),
+    2 - 1 / 60
+  );
 });
