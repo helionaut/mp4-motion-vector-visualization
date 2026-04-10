@@ -96,6 +96,45 @@ export function projectMotionVector({
   };
 }
 
+export function getMotionFieldCell({
+  vector,
+  analysisWidth,
+  analysisHeight,
+  displayRect,
+  gridStep = 16
+}) {
+  const scaleX = displayRect.width / analysisWidth;
+  const scaleY = displayRect.height / analysisHeight;
+  const cellWidth = Math.max(1, gridStep * scaleX);
+  const cellHeight = Math.max(1, gridStep * scaleY);
+
+  return {
+    x: displayRect.x + (vector.x - gridStep / 2) * scaleX,
+    y: displayRect.y + (vector.y - gridStep / 2) * scaleY,
+    width: cellWidth,
+    height: cellHeight
+  };
+}
+
+export function getMotionFieldColor(vector, maximumMagnitude = 1) {
+  const magnitude = Math.hypot(vector.dx, vector.dy);
+  const clampedMaximum = Math.max(1, maximumMagnitude);
+  const normalizedMagnitude = Math.min(1, magnitude / clampedMaximum);
+  const direction = Math.atan2(vector.dy, vector.dx);
+  const hue = ((direction * 180) / Math.PI + 360) % 360;
+  const saturation = 72;
+  const lightness = 34 + normalizedMagnitude * 28;
+  const alpha = 0.24 + normalizedMagnitude * 0.52;
+
+  return `hsla(${hue.toFixed(1)} ${saturation}% ${lightness.toFixed(1)}% / ${alpha.toFixed(3)})`;
+}
+
+export function getMaximumMotionMagnitude(vectors) {
+  return vectors.reduce((maximum, vector) => {
+    return Math.max(maximum, Math.hypot(vector.dx, vector.dy));
+  }, 0);
+}
+
 function blockDifference(frameA, frameB, width, blockX, blockY, sampleSize, dx, dy) {
   let score = 0;
   const startX = blockX + dx;
