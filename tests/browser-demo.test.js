@@ -6,10 +6,10 @@ import {
   describeSplitAttempt,
   estimateMotionVectors,
   formatFileMeta,
-  getFlowColor,
   getContainedVideoRect,
-  getVectorMagnitude,
-  projectFlowCell,
+  getMaximumMotionMagnitude,
+  getMotionFieldCell,
+  getMotionFieldColor,
   projectMotionVector
 } from "../browser-demo/lib/flow-core.js";
 
@@ -100,23 +100,8 @@ test("projectMotionVector uses the contained video rect instead of the full canv
   });
 });
 
-test("getVectorMagnitude measures motion length", () => {
-  assert.equal(getVectorMagnitude({ dx: 3, dy: 4 }), 5);
-});
-
-test("getFlowColor encodes direction and stronger magnitude into the fill style", () => {
-  assert.equal(
-    getFlowColor({ dx: 4, dy: 0 }, { maxMagnitude: 4 }),
-    "hsla(180, 88%, 58%, 0.60)"
-  );
-  assert.equal(
-    getFlowColor({ dx: 0, dy: -2 }, { maxMagnitude: 4 }),
-    "hsla(90, 74%, 43%, 0.39)"
-  );
-});
-
-test("projectFlowCell converts an analysis-grid vector into a display cell", () => {
-  const cell = projectFlowCell({
+test("getMotionFieldCell projects a flow cell into the displayed video area", () => {
+  const cell = getMotionFieldCell({
     vector: { x: 80, y: 45, dx: 4, dy: -2 },
     analysisWidth: 160,
     analysisHeight: 90,
@@ -130,4 +115,19 @@ test("projectFlowCell converts an analysis-grid vector into a display cell", () 
     width: 96,
     height: 128
   });
+});
+
+test("getMaximumMotionMagnitude returns the strongest vector length", () => {
+  const magnitude = getMaximumMotionMagnitude([
+    { dx: 1, dy: 2 },
+    { dx: 3, dy: 4 },
+    { dx: -2, dy: 1 }
+  ]);
+
+  assert.equal(magnitude, 5);
+});
+
+test("getMotionFieldColor encodes vector direction and magnitude into hsla", () => {
+  const color = getMotionFieldColor({ dx: 3, dy: 4 }, 5);
+  assert.match(color, /^hsla\(53\.1 72% 62\.0% \/ 0\.760\)$/);
 });

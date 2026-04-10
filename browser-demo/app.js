@@ -4,10 +4,10 @@ import {
   describeSplitAttempt,
   estimateMotionVectors,
   formatFileMeta,
-  getFlowColor,
   getContainedVideoRect,
-  getVectorMagnitude,
-  projectFlowCell,
+  getMaximumMotionMagnitude,
+  getMotionFieldCell,
+  getMotionFieldColor,
   projectMotionVector
 } from "./lib/flow-core.js";
 
@@ -69,6 +69,10 @@ class VideoAnalyzer {
     this.sampleCounter = 0;
     this.analysisWidth = 160;
     this.analysisHeight = 90;
+    this.gridStep = 16;
+    this.sampleSize = 10;
+    this.searchRadius = 4;
+    this.minimumConfidence = 22;
     this.frameCallbackBound = this.onFrame.bind(this);
     this.latestVectors = [];
     this.metadata = {};
@@ -161,10 +165,10 @@ class VideoAnalyzer {
       currentFrame: currentPlane,
       width: this.analysisWidth,
       height: this.analysisHeight,
-      gridStep: 16,
-      sampleSize: 10,
-      searchRadius: 4,
-      minimumConfidence: 22
+      gridStep: this.gridStep,
+      sampleSize: this.sampleSize,
+      searchRadius: this.searchRadius,
+      minimumConfidence: this.minimumConfidence
     });
     this.lastRenderedFrameToken = frameToken;
   }
@@ -182,7 +186,7 @@ class VideoAnalyzer {
       videoHeight: this.metadata.height
     });
     const vectors = this.lastRenderedFrameToken === this.currentFrameToken ? this.latestVectors : [];
-    const maxMagnitude = Math.max(1, ...vectors.map((vector) => getVectorMagnitude(vector)));
+    const maximumMagnitude = getMaximumMotionMagnitude(vectors);
 
     this.overlayContext.save();
     this.overlayContext.beginPath();
@@ -193,13 +197,14 @@ class VideoAnalyzer {
     this.overlayContext.lineWidth = 1;
 
     for (const vector of vectors) {
-      const cell = projectFlowCell({
+      const cell = getMotionFieldCell({
         vector,
         analysisWidth: this.analysisWidth,
         analysisHeight: this.analysisHeight,
         displayRect,
-        gridStep: 16
+        gridStep: this.gridStep
       });
+      const fill = getMotionFieldColor(vector, maximumMagnitude);
       const { fromX, fromY, toX, toY } = projectMotionVector({
         vector,
         analysisWidth: this.analysisWidth,
@@ -207,10 +212,13 @@ class VideoAnalyzer {
         displayRect,
         vectorScale: 1.25
       });
-      const flowColor = getFlowColor(vector, { maxMagnitude });
-      const lineAlpha = Math.min(0.9, 0.35 + getVectorMagnitude(vector) / Math.max(1, maxMagnitude) * 0.45);
+      const magnitudeRatio = Math.min(
+        1,
+        Math.hypot(vector.dx, vector.dy) / Math.max(1, maximumMagnitude)
+      );
+      const lineAlpha = Math.min(0.9, 0.35 + magnitudeRatio * 0.45);
 
-      this.overlayContext.fillStyle = flowColor;
+      this.overlayContext.fillStyle = fill;
       this.overlayContext.fillRect(cell.x, cell.y, cell.width, cell.height);
 
       this.overlayContext.strokeStyle = `rgba(245, 248, 255, ${lineAlpha.toFixed(2)})`;

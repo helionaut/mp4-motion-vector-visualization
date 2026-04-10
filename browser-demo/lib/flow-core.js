@@ -96,22 +96,7 @@ export function projectMotionVector({
   };
 }
 
-export function getVectorMagnitude(vector) {
-  return Math.hypot(vector.dx, vector.dy);
-}
-
-export function getFlowColor(vector, { maxMagnitude = 1 } = {}) {
-  const safeMaxMagnitude = Math.max(1, maxMagnitude);
-  const magnitudeRatio = Math.min(1, getVectorMagnitude(vector) / safeMaxMagnitude);
-  const hue = (Math.atan2(vector.dy, vector.dx) * 180) / Math.PI + 180;
-  const saturation = Math.round(60 + magnitudeRatio * 28);
-  const lightness = Math.round(28 + magnitudeRatio * 30);
-  const alpha = (0.18 + magnitudeRatio * 0.42).toFixed(2);
-
-  return `hsla(${Math.round(hue)}, ${saturation}%, ${lightness}%, ${alpha})`;
-}
-
-export function projectFlowCell({
+export function getMotionFieldCell({
   vector,
   analysisWidth,
   analysisHeight,
@@ -120,17 +105,34 @@ export function projectFlowCell({
 }) {
   const scaleX = displayRect.width / analysisWidth;
   const scaleY = displayRect.height / analysisHeight;
-  const cellWidth = gridStep * scaleX;
-  const cellHeight = gridStep * scaleY;
-  const centerX = displayRect.x + vector.x * scaleX;
-  const centerY = displayRect.y + vector.y * scaleY;
+  const cellWidth = Math.max(1, gridStep * scaleX);
+  const cellHeight = Math.max(1, gridStep * scaleY);
 
   return {
-    x: centerX - cellWidth / 2,
-    y: centerY - cellHeight / 2,
+    x: displayRect.x + (vector.x - gridStep / 2) * scaleX,
+    y: displayRect.y + (vector.y - gridStep / 2) * scaleY,
     width: cellWidth,
     height: cellHeight
   };
+}
+
+export function getMotionFieldColor(vector, maximumMagnitude = 1) {
+  const magnitude = Math.hypot(vector.dx, vector.dy);
+  const clampedMaximum = Math.max(1, maximumMagnitude);
+  const normalizedMagnitude = Math.min(1, magnitude / clampedMaximum);
+  const direction = Math.atan2(vector.dy, vector.dx);
+  const hue = ((direction * 180) / Math.PI + 360) % 360;
+  const saturation = 72;
+  const lightness = 34 + normalizedMagnitude * 28;
+  const alpha = 0.24 + normalizedMagnitude * 0.52;
+
+  return `hsla(${hue.toFixed(1)} ${saturation}% ${lightness.toFixed(1)}% / ${alpha.toFixed(3)})`;
+}
+
+export function getMaximumMotionMagnitude(vectors) {
+  return vectors.reduce((maximum, vector) => {
+    return Math.max(maximum, Math.hypot(vector.dx, vector.dy));
+  }, 0);
 }
 
 function blockDifference(frameA, frameB, width, blockX, blockY, sampleSize, dx, dy) {
