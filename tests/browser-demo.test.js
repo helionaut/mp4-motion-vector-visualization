@@ -2,14 +2,18 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  DEFAULT_FRAME_RATE,
+  DENSE_FLOW_ANALYSIS,
   computeLumaPlane,
   describeSplitAttempt,
   estimateMotionVectors,
   formatFileMeta,
+  getFrameStepDeltaSeconds,
   getContainedVideoRect,
   getMaximumMotionMagnitude,
   getMotionFieldCell,
   getMotionFieldColor,
+  getSteppedTime,
   projectMotionVector
 } from "../browser-demo/lib/flow-core.js";
 
@@ -38,6 +42,37 @@ test("computeLumaPlane converts RGBA bytes into grayscale pixels", () => {
     1
   );
   assert.deepEqual(Array.from(luma), [76, 150]);
+});
+
+test("dense flow analysis preset favors a tight grid and larger analysis surface", () => {
+  assert.deepEqual(DENSE_FLOW_ANALYSIS, {
+    analysisWidth: 320,
+    analysisHeight: 180,
+    gridStep: 8,
+    sampleSize: 6,
+    searchRadius: 4,
+    minimumConfidence: 14,
+    vectorScale: 1.1
+  });
+});
+
+test("getFrameStepDeltaSeconds falls back to 30fps for invalid frame rates", () => {
+  assert.equal(getFrameStepDeltaSeconds(DEFAULT_FRAME_RATE), 1 / 30);
+  assert.equal(getFrameStepDeltaSeconds(0), 1 / 30);
+});
+
+test("getSteppedTime moves exactly one frame and clamps within the media duration", () => {
+  assert.equal(
+    getSteppedTime({ currentTime: 1, duration: 4, direction: 1, frameRate: 25 }),
+    1.04
+  );
+  assert.equal(
+    getSteppedTime({ currentTime: 0.01, duration: 4, direction: -1, frameRate: 25 }),
+    0
+  );
+  assert.ok(
+    getSteppedTime({ currentTime: 3.99, duration: 4, direction: 1, frameRate: 25 }) <= 4
+  );
 });
 
 test("estimateMotionVectors detects simple rightward motion", () => {
@@ -115,6 +150,26 @@ test("getMotionFieldCell projects a flow cell into the displayed video area", ()
     width: 96,
     height: 128
   });
+});
+
+test("denser motion field cells shrink with a tighter grid", () => {
+  const coarseCell = getMotionFieldCell({
+    vector: { x: 80, y: 45, dx: 4, dy: -2 },
+    analysisWidth: 320,
+    analysisHeight: 180,
+    displayRect: { x: 0, y: 0, width: 1280, height: 720 },
+    gridStep: 16
+  });
+  const denseCell = getMotionFieldCell({
+    vector: { x: 80, y: 45, dx: 4, dy: -2 },
+    analysisWidth: 320,
+    analysisHeight: 180,
+    displayRect: { x: 0, y: 0, width: 1280, height: 720 },
+    gridStep: 8
+  });
+
+  assert.ok(denseCell.width < coarseCell.width);
+  assert.ok(denseCell.height < coarseCell.height);
 });
 
 test("getMaximumMotionMagnitude returns the strongest vector length", () => {

@@ -25,7 +25,7 @@ body {
 }
 
 .shell {
-  width: min(1240px, calc(100vw - 32px));
+  width: min(1500px, calc(100vw - 32px));
   margin: 0 auto;
   padding: 32px 0 48px;
 }
@@ -126,6 +126,13 @@ button:hover {
   align-items: center;
 }
 
+.playback-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;
@@ -146,12 +153,12 @@ button:hover {
 
 .viewer-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 18px;
 }
 
 .viewer-card {
-  padding: 16px;
+  padding: 20px;
 }
 
 .video-stack {
@@ -160,6 +167,7 @@ button:hover {
   overflow: hidden;
   background: #0f1113;
   aspect-ratio: 16 / 9;
+  min-height: clamp(320px, 42vw, 760px);
 }
 
 video,
@@ -181,13 +189,17 @@ video {
 
 @media (max-width: 900px) {
   .uploader,
-  .viewer-grid,
-  .control-grid {
+  .control-grid,
+  .playback-strip {
     grid-template-columns: 1fr;
   }
 
   .shell {
     width: min(100vw - 20px, 1240px);
     padding-top: 20px;
+  }
+
+  .video-stack {
+    min-height: clamp(240px, 68vw, 420px);
   }
 }
