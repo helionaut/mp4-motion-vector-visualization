@@ -4,7 +4,10 @@ import {
   describeSplitAttempt,
   estimateMotionVectors,
   formatFileMeta,
+  getFlowColor,
   getContainedVideoRect,
+  getVectorMagnitude,
+  projectFlowCell,
   projectMotionVector
 } from "./lib/flow-core.js";
 
@@ -179,30 +182,46 @@ class VideoAnalyzer {
       videoHeight: this.metadata.height
     });
     const vectors = this.lastRenderedFrameToken === this.currentFrameToken ? this.latestVectors : [];
+    const maxMagnitude = Math.max(1, ...vectors.map((vector) => getVectorMagnitude(vector)));
 
     this.overlayContext.save();
     this.overlayContext.beginPath();
     this.overlayContext.rect(displayRect.x, displayRect.y, displayRect.width, displayRect.height);
     this.overlayContext.clip();
-    this.overlayContext.strokeStyle = "#ffd166";
-    this.overlayContext.fillStyle = "rgba(255, 209, 102, 0.28)";
-    this.overlayContext.lineWidth = 1.4;
+    this.overlayContext.fillStyle = "rgba(4, 10, 18, 0.2)";
+    this.overlayContext.fillRect(displayRect.x, displayRect.y, displayRect.width, displayRect.height);
+    this.overlayContext.lineWidth = 1;
 
     for (const vector of vectors) {
+      const cell = projectFlowCell({
+        vector,
+        analysisWidth: this.analysisWidth,
+        analysisHeight: this.analysisHeight,
+        displayRect,
+        gridStep: 16
+      });
       const { fromX, fromY, toX, toY } = projectMotionVector({
         vector,
         analysisWidth: this.analysisWidth,
         analysisHeight: this.analysisHeight,
-        displayRect
+        displayRect,
+        vectorScale: 1.25
       });
+      const flowColor = getFlowColor(vector, { maxMagnitude });
+      const lineAlpha = Math.min(0.9, 0.35 + getVectorMagnitude(vector) / Math.max(1, maxMagnitude) * 0.45);
 
+      this.overlayContext.fillStyle = flowColor;
+      this.overlayContext.fillRect(cell.x, cell.y, cell.width, cell.height);
+
+      this.overlayContext.strokeStyle = `rgba(245, 248, 255, ${lineAlpha.toFixed(2)})`;
       this.overlayContext.beginPath();
       this.overlayContext.moveTo(fromX, fromY);
       this.overlayContext.lineTo(toX, toY);
       this.overlayContext.stroke();
 
+      this.overlayContext.fillStyle = "rgba(245, 248, 255, 0.55)";
       this.overlayContext.beginPath();
-      this.overlayContext.arc(fromX, fromY, 1.6, 0, Math.PI * 2);
+      this.overlayContext.arc(fromX, fromY, 1.4, 0, Math.PI * 2);
       this.overlayContext.fill();
     }
 

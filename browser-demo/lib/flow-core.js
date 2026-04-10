@@ -96,6 +96,43 @@ export function projectMotionVector({
   };
 }
 
+export function getVectorMagnitude(vector) {
+  return Math.hypot(vector.dx, vector.dy);
+}
+
+export function getFlowColor(vector, { maxMagnitude = 1 } = {}) {
+  const safeMaxMagnitude = Math.max(1, maxMagnitude);
+  const magnitudeRatio = Math.min(1, getVectorMagnitude(vector) / safeMaxMagnitude);
+  const hue = (Math.atan2(vector.dy, vector.dx) * 180) / Math.PI + 180;
+  const saturation = Math.round(60 + magnitudeRatio * 28);
+  const lightness = Math.round(28 + magnitudeRatio * 30);
+  const alpha = (0.18 + magnitudeRatio * 0.42).toFixed(2);
+
+  return `hsla(${Math.round(hue)}, ${saturation}%, ${lightness}%, ${alpha})`;
+}
+
+export function projectFlowCell({
+  vector,
+  analysisWidth,
+  analysisHeight,
+  displayRect,
+  gridStep = 16
+}) {
+  const scaleX = displayRect.width / analysisWidth;
+  const scaleY = displayRect.height / analysisHeight;
+  const cellWidth = gridStep * scaleX;
+  const cellHeight = gridStep * scaleY;
+  const centerX = displayRect.x + vector.x * scaleX;
+  const centerY = displayRect.y + vector.y * scaleY;
+
+  return {
+    x: centerX - cellWidth / 2,
+    y: centerY - cellHeight / 2,
+    width: cellWidth,
+    height: cellHeight
+  };
+}
+
 function blockDifference(frameA, frameB, width, blockX, blockY, sampleSize, dx, dy) {
   let score = 0;
   const startX = blockX + dx;

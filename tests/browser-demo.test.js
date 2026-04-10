@@ -6,7 +6,10 @@ import {
   describeSplitAttempt,
   estimateMotionVectors,
   formatFileMeta,
+  getFlowColor,
   getContainedVideoRect,
+  getVectorMagnitude,
+  projectFlowCell,
   projectMotionVector
 } from "../browser-demo/lib/flow-core.js";
 
@@ -94,5 +97,37 @@ test("projectMotionVector uses the contained video rect instead of the full canv
     fromY: 360,
     toX: 692.8,
     toY: 324.8
+  });
+});
+
+test("getVectorMagnitude measures motion length", () => {
+  assert.equal(getVectorMagnitude({ dx: 3, dy: 4 }), 5);
+});
+
+test("getFlowColor encodes direction and stronger magnitude into the fill style", () => {
+  assert.equal(
+    getFlowColor({ dx: 4, dy: 0 }, { maxMagnitude: 4 }),
+    "hsla(180, 88%, 58%, 0.60)"
+  );
+  assert.equal(
+    getFlowColor({ dx: 0, dy: -2 }, { maxMagnitude: 4 }),
+    "hsla(90, 74%, 43%, 0.39)"
+  );
+});
+
+test("projectFlowCell converts an analysis-grid vector into a display cell", () => {
+  const cell = projectFlowCell({
+    vector: { x: 80, y: 45, dx: 4, dy: -2 },
+    analysisWidth: 160,
+    analysisHeight: 90,
+    displayRect: { x: 160, y: 0, width: 960, height: 720 },
+    gridStep: 16
+  });
+
+  assert.deepEqual(cell, {
+    x: 592,
+    y: 296,
+    width: 96,
+    height: 128
   });
 });
